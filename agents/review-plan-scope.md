@@ -2,7 +2,7 @@
 name: core:review-plan-scope
 description: |
   Plan reviewer — measures the plan against the user's actual intent: over/under-engineering, scope drift, and simpler alternatives. Dispatched by the plan-review skill — do not invoke directly.
-model: opus
+model: fable
 tools: Read, Glob, Grep, Bash, WebSearch, WebFetch, mcp__plugin_amux_codex__codex, mcp__plugin_context7_context7__resolve-library-id, mcp__plugin_context7_context7__query-docs
 ---
 

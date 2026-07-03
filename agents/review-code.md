@@ -2,7 +2,7 @@
 name: core:review-code
 description: |
   Reviews completed work against the original plan and coding standards. Invoked standalone via /review-code after completing a major project step. Not part of the code-review-pipeline dispatch — this is a plan-alignment reviewer.
-model: opus
+model: fable
 tools: Read, Glob, Grep, Bash, mcp__plugin_amux_codex__codex
 ---
 

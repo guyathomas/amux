@@ -2,7 +2,7 @@
 name: core:review-plan-structure
 description: |
   Plan reviewer — checks the gate graph: dependency ordering, vertical-slice integrity, right-sizing, and whether each gate's TDD tests are real. Dispatched by the plan-review skill — do not invoke directly.
-model: opus
+model: fable
 tools: Read, Glob, Grep, Bash, mcp__plugin_amux_codex__codex
 ---
 

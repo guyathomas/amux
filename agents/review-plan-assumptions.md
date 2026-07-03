@@ -2,7 +2,7 @@
 name: core:review-plan-assumptions
 description: |
   Plan reviewer — audits a written plan against reality: load-bearing assumptions, codebase fit, and evidence freshness. Dispatched by the plan-review skill — do not invoke directly.
-model: opus
+model: fable
 tools: Read, Glob, Grep, Bash, WebSearch, WebFetch, mcp__plugin_amux_codex__codex, mcp__plugin_amux_btca-local__listResources, mcp__plugin_amux_btca-local__ask, mcp__plugin_context7_context7__resolve-library-id, mcp__plugin_context7_context7__query-docs
 ---
 
