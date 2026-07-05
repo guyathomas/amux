@@ -1,5 +1,5 @@
 ---
-description: "Use before implementing non-trivial features (researches approaches with Context7, Serper, GitHub MCPs)"
+description: "Use before implementing non-trivial features (researches approaches against real sources; dual-engine evaluation)"
 argument-hint: "[feature or task to plan]"
 ---
 

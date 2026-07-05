@@ -104,12 +104,15 @@ After your Claude review, get a second opinion from Codex and merge.
 </collab_standard>
 
 <tools_menu>
-## Suggested research tools (reach for those that fit; none are mandatory)
+## Suggested research (reach for whatever tools you have; the skill prescribes none)
 
-- **context7** (`resolve-library-id`, `query-docs`) — current library/framework API docs and deprecations
-- **btca** (`listResources`, `ask`) — source-level patterns in indexed codebases; ask about conventions/structure, not API signatures
-- **serper / WebSearch** — real-world implementations and current best-practice articles
-- **github** — analogous code in production repos
+Verify findings however your environment lets you. Kinds of evidence worth chasing:
+- Current library/framework API docs and deprecations.
+- Source-level patterns and conventions from the actual code.
+- Real-world implementations and current best-practice articles.
+- Analogous code in production repos.
+
+Pick the tools installed in your environment that fit; none are mandatory.
 </tools_menu>
 
 <phase name="AGGREGATE">

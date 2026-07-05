@@ -22,18 +22,13 @@ Don't use for simple factual questions a single search answers, or topics too na
 <required_tools>
 | Tool / Feature | Purpose | Required |
 |------|---------|----------|
-| `WebSearch` | Search queries (built-in) | Yes |
+| Web search | Run search queries | Yes |
+| Web page fetch/scrape | Pull full page content from sources | Yes |
 | Agent teams | Spawn parallel researcher teammates | Yes |
-| `firecrawl-mcp:firecrawl_scrape` | Scrape full page content (preferred) | No |
-| `WebFetch` | Fetch page content (built-in fallback) | Fallback |
 
 **Prerequisite:** Agent teams must be enabled (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` in settings or environment).
 
-Tool Selection: In INIT phase, check if `firecrawl-mcp:firecrawl_scrape` is available. If not, use `WebFetch` (built-in). Record choice in `state.json` as `"scraper": "firecrawl"` or `"scraper": "webfetch"`.
-
-Tradeoffs:
-- `firecrawl-mcp:firecrawl_scrape`: Better content extraction, handles JS-rendered pages
-- `WebFetch`: Always available, sufficient for static pages
+Tool Selection: Use whatever search and page-fetch tools your environment provides. The built-in `WebSearch` / `WebFetch` always work; if you have a richer search or scrape tool installed, prefer it for better extraction on JS-rendered pages. The skill doesn't prescribe a specific provider — pick what gives the best results for the sources you hit.
 </required_tools>
 
 <state_machine>
@@ -56,7 +51,6 @@ State File: `research/{slug}/state.json`
   "codexCompletions": 0,
   "findingsCount": 0,
   "startTime": "ISO-8601 timestamp",
-  "scraper": "firecrawl|webfetch",
   "questions": [{"id": 1, "text": "...", "status": "pending|done", "confidence": null}]
 }
 ```
@@ -103,10 +97,7 @@ On skill invocation, first check for existing state:
    - Truncate to 50 characters
    - Example: "AI in Healthcare 2024!" → `ai-in-healthcare-2024`
 
-2. Detect available scraper:
-   - Check if `firecrawl-mcp:firecrawl_scrape` tool exists
-   - If firecrawl available → `"scraper": "firecrawl"`
-   - If not available → `"scraper": "webfetch"` (uses built-in `WebFetch`)
+2. Note which search and page-fetch tools your environment provides (built-in `WebSearch` / `WebFetch` are always available; use a richer installed tool if you have one). No specific provider is required.
 
 3. Create working directory:
    ```bash
@@ -149,14 +140,14 @@ Create an agent team to research pending questions in parallel. Each teammate in
 
 **Claude teammates:** One per pending question (up to 8 at a time). Each works independently with its own context window. Each teammate also calls the `codex` MCP tool to get Codex's perspective on the same question, providing genuine cross-validation — two engines may surface different sources and perspectives.
 
-Read `scraper` from state.json. Spawn each Claude teammate with these instructions, substituting `{SCRAPER}` = `firecrawl-mcp:firecrawl_scrape` or `WebFetch` accordingly:
+Spawn each Claude teammate with these instructions:
 
 <teammate_instructions>
-You are a researcher teammate with `WebSearch` and `{SCRAPER}`.
+You are a researcher teammate. Use whatever web search and page-fetch tools you have available (the built-in `WebSearch` / `WebFetch` always work; prefer a richer installed tool if you have one).
 
 **TASK:** {QUESTION}
 
-Run enough searches to answer the question well, then scrape the best sources with `{SCRAPER}` ("Extract main content and key facts") and extract specific facts with their sources. Continue if a scrape fails. Use your judgment on how many searches and sources are enough.
+Run enough searches to answer the question well, then fetch the best sources ("Extract main content and key facts") and extract specific facts with their sources. Continue if a fetch fails. Use your judgment on how many searches and sources are enough.
 
 Quality guide (favour higher tiers): Tier 1 — .gov, .edu, journals, official docs · Tier 2 — Reuters, AP, BBC, industry pubs · Tier 3 — company blogs, Wikipedia · Skip — forums, social media, SEO spam.
 </teammate_instructions>
@@ -304,7 +295,7 @@ The task loop hook will display this message when the session exits.
 | Scrape fails | Continue with other URLs |
 | Rate limit | Wait 60s, reduce batch to 2 |
 | No results | Mark low confidence, rephrase as follow-up |
-| Tool not found | Fall back to WebFetch, update state.json |
+| Preferred fetch tool unavailable | Fall back to built-in `WebFetch` |
 | `codex` MCP unavailable, empty, or error-text response | Teammate returns Claude-only findings, research continues |
 </error_handling>
 
