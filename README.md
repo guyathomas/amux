@@ -7,7 +7,7 @@ Research, planning, and code review skills for Claude Code with dual-engine cros
 ### Skills (4)
 
 - **research** — Deep research with 20+ sources and confidence tracking, powered by agent teams with Codex cross-validation
-- **planning** — Pre-implementation planning that researches approaches using Context7, Serper, GitHub MCPs, and optionally btca for source-level codebase research, with dual-engine evaluation via Codex MCP. Once an approach is selected, a BUILD-PLAN step writes a PRD broken into TDD-gated vertical slices — each gate opens with failing tests and closes only when lint, format, test, and build pass — then a multi-agent REVIEW-PLAN step (delegating to **plan-review**) stress-tests the assembled plan before any code is written.
+- **planning** — Pre-implementation planning that researches approaches against real sources (current docs, web search, analogous codebases) — the skill prescribes no specific research MCPs; you use whatever your environment provides — with dual-engine evaluation via Codex MCP. Once an approach is selected, a BUILD-PLAN step writes a PRD broken into TDD-gated vertical slices — each gate opens with failing tests and closes only when lint, format, test, and build pass — then a multi-agent REVIEW-PLAN step (delegating to **plan-review**) stress-tests the assembled plan before any code is written.
 - **plan-review** — Multi-reviewer critique of a *written plan* (the plan-equivalent of code-review-pipeline): four parallel dual-engine reviewers (assumptions, completeness, structure, scope) audit `plans/{slug}/prd.md`, auto-apply mechanical fixes, and gate scope/approach changes for the user. Runs at planning's REVIEW-PLAN phase or standalone via `/plan-review`.
 - **code-review-pipeline** — Multi-reviewer code review using agent teams (code, tests, docs), each cross-validated with Codex. The skill owns the dual-engine collaboration standard and the suggested-tools menu, injecting both into every reviewer.
 
@@ -56,7 +56,7 @@ Cross-validated findings (flagged by both engines) receive a confidence boost �
 - **Claude Code** with plugin support
 - **Codex CLI** (optional, for dual-engine mode): `npm i -g @openai/codex`
 - **Codex MCP server** is declared as an MCP dependency (uses `codex mcp-server` — requires Codex CLI installed)
-- **btca** (optional, for source-level codebase research in planning): `bun add -g btca` then `claude mcp add --transport stdio btca-local -- bunx btca mcp`
+- **Research MCPs** (optional) — the research, planning, and review skills don't prescribe any specific research tools; they use whatever is installed (built-in `WebSearch`/`WebFetch` always work). Install any docs/search/scrape/codebase MCPs you like and the skills will use them.
 
 ## Installation
 

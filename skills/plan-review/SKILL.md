@@ -103,13 +103,16 @@ After your Claude review, get a second opinion from Codex and merge.
 </collab_standard>
 
 <tools_menu>
-## Suggested research tools (reach for those that fit; none are mandatory)
+## Suggested research (reach for whatever tools you have; the skill prescribes none)
 
-- **context7** (`resolve-library-id`, `query-docs`) — verify an assumed API exists / is not deprecated; confirm a simpler library-native approach
-- **btca** (`listResources`, `ask`) — source-level patterns in indexed codebases; verify a plan's assumed conventions against real source
-- **serper / WebSearch** — real-world implementations; confirm a simpler alternative is a real pattern
-- **github** — analogous plans/implementations in production repos
+Verify claims however your environment lets you. Kinds of evidence worth chasing:
+- Confirm an assumed API exists / isn't deprecated; confirm a simpler library-native approach is real.
+- Source-level patterns and conventions from the actual code the plan integrates with.
+- Real-world implementations that confirm a simpler alternative is an established pattern.
+- Analogous plans/implementations in production repos.
 - **Read / Glob / Grep** — the actual repo: do the files, modules, and patterns the plan names exist?
+
+Pick the tools installed in your environment that fit; none are mandatory.
 </tools_menu>
 
 <phase name="AGGREGATE">
@@ -170,7 +173,7 @@ Present the summary:
 
 ### Needs your decision (scope / approach — not applied)
 - [high] gate-4 — adds a caching layer the original ask never mentioned → cut or confirm?
-- [medium] approach — a simpler library-native pattern exists (Context7-confirmed) → switch?
+- [medium] approach — a simpler library-native pattern exists (confirmed against current docs) → switch?
 
 ### Verify before building (guessed assumptions)
 - users table soft-delete column — Gate 3 query assumes it; confirm it exists

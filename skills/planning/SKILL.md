@@ -1,6 +1,6 @@
 ---
 name: planning
-description: Use before implementing any non-trivial feature - validates approaches against real sources using Context7, Serper, GitHub MCPs, and optionally btca for source-level codebase research. Evaluates with dual engines before committing to an implementation
+description: Use before implementing any non-trivial feature - validates approaches against real sources (current docs, web search, analogous codebases) before committing. Evaluates with dual engines before committing to an implementation
 ---
 
 # Planning
@@ -22,15 +22,17 @@ Research-first planning. Validate approaches against real documentation, real co
 
 **Don't use for:** Single-line fixes, obvious bugs, tasks with explicit instructions.
 
-## Suggested research tools
+## Suggested research
 
-Reach for the tools that fit what you need to learn — which and how many is your call. RESEARCH runs these in parallel as subagents.
+Reach for whatever tools you have available to gather evidence — which and how many is your call. The skill doesn't prescribe specific research tools; pick what fits the problem from what's installed. RESEARCH runs these in parallel as subagents.
 
-- **Context7** (`resolve-library-id`, `query-docs`) — current library/framework API docs, version gotchas, deprecations
-- **Serper / WebSearch** — real-world implementations, best-practice articles, comparisons
-- **GitHub** (`search-code`, `search-repositories`) — how production codebases structure this; common pitfalls
-- **btca** (`listResources`, `ask`) — source-level patterns in indexed codebases; ask about conventions/structure, not API signatures (optional; only when resources are flagged in UNDERSTAND)
-- **Codex** (`gpt-5-codex`) — second-engine evaluation in EVALUATE
+Kinds of evidence worth gathering:
+- Current library/framework API docs — version gotchas, deprecations
+- Real-world implementations, best-practice articles, comparisons
+- How production codebases structure this; common pitfalls
+- Source-level patterns and conventions from the actual code
+
+The one fixed tool is **Codex** (`gpt-5-codex`) — the second engine for EVALUATE (see the dual-engine standard). Everything else is your choice from what your environment provides.
 
 ## Dual-engine standard
 
@@ -80,72 +82,15 @@ Check for an existing `plans/{slug}/` directory first. If one exists with `phase
 
 Create `plans/{slug}/` directory (if new) and initialize `state.json` with `phase: "UNDERSTAND"`.
 
-#### btca Resource Check (optional)
-
-If the btca MCP tools are available (`listResources`, `ask`):
-
-1. Call `listResources` to see what codebase resources are indexed
-2. Match resources against the project's tech stack (check `package.json`, import statements, config files)
-3. If matching resources exist, flag them in `state.json` as `"btcaResources": ["resource-name"]` for the RESEARCH phase
-
-**When btca adds value** (flag for RESEARCH):
-- Feature involves framework conventions, patterns, or architecture (routing, auth, SSR, data loading)
-- Project uses less-documented or rapidly evolving libraries
-- Project depends on internal/private codebases with no public docs
-- The question is "how should we structure X?" — not "what API does Y have?"
-
-**Skip btca when:**
-- The question is about API usage — Context7 already provides clear docs
-- Libraries are mature and well-documented (React, Express, lodash, zod)
-- No framework-level architectural decisions are involved
-
-**If btca is available but no matching resources exist** and the feature involves framework patterns:
-- Identify the canonical repo URL for relevant dependencies (run `npm view {pkg} repository.url` for npm packages)
-- Suggest specific commands: `btca add -n {name} {repo-url}`
-  - For monorepos, include `--searchPath`: `btca add -n sveltekit https://github.com/sveltejs/kit --searchPath packages/kit`
-- Offer to run the commands if the user approves
-
-**If btca MCP is not configured** but the btca CLI is detected (noted in session-start):
-- Suggest one-time setup: `claude mcp add --transport stdio btca-local -- bunx btca mcp`
-
 ### RESEARCH
 
-Gather evidence from the **Suggested research tools** (see top) that fit the problem — you decide which and how many. Run them in parallel using subagents, and add others (reading the codebase directly) as warranted. Ground approaches in real evidence, not guesses. Planning-specific usage of each:
+Gather evidence from whatever research tools you have available (see **Suggested research** at top) that fit the problem — you decide which and how many. Run them in parallel using subagents, and read the codebase directly as warranted. Ground approaches in real evidence, not guesses.
 
-#### Context7: Current Library Docs
-```
-1. resolve-library-id for each relevant library
-2. query-docs for the specific feature/API needed
-3. Note: version-specific gotchas, recommended patterns, deprecations
-```
-
-#### Serper Search: Real-World Implementations
-```
-1. Search for "[feature] [framework] implementation"
-2. Search for "[feature] best practices [year]"
-3. Look for: blog posts with code, official guides, comparison articles
-```
-
-#### GitHub: Analogous Codebases
-```
-1. search-code for the pattern/API in real projects
-2. search-repositories for projects solving the same problem
-3. Look for: how production codebases structure this, common pitfalls
-```
-
-#### btca: Source-Level Patterns (optional)
-
-Only run this subagent if `state.json` has `btcaResources` flagged from the UNDERSTAND phase.
-
-```
-1. Call btca ask with the matched resources
-2. Ask about patterns, conventions, and structure — not API signatures
-   e.g. "How does SvelteKit handle server-side authentication?"
-   NOT "What parameters does the redirect function accept?"
-3. Note: answers are grounded in actual source code, not documentation
-```
-
-If btca `ask` fails or returns no useful results, continue without it.
+Whatever tools you reach for, aim to establish:
+- **Current library/API docs** — real signatures, version-specific gotchas, recommended patterns, deprecations for each relevant library.
+- **Real-world implementations** — how others solve this; best-practice patterns; comparison articles and official guides.
+- **Analogous production code** — how real codebases structure this and the pitfalls they hit.
+- **Source-level conventions** — patterns in the actual code you'll integrate with (structure and conventions, not just API signatures).
 
 Update `state.json` with `phase: "RESEARCH"`.
 
@@ -161,10 +106,10 @@ For each approach, provide:
 **How it works:** [2-3 sentences]
 
 **Evidence:**
-- Context7: [what the docs say about this approach]
-- Serper: [what real-world articles recommend]
-- GitHub: [how production codebases do it]
-- btca: [what the source code reveals about patterns/structure] (if available)
+- Docs: [what current library/API docs say about this approach]
+- Prior art: [what real-world implementations / articles recommend]
+- Production code: [how real codebases do it]
+- Source: [what the actual source reveals about patterns/structure] (if gathered)
 
 **Trade-offs:**
 - Pro: [concrete benefit with source]
@@ -181,7 +126,7 @@ Write `plans/{slug}/approaches.json`:
     "index": 1,
     "name": "Approach Name",
     "howItWorks": "description",
-    "evidence": { "context7": "...", "serper": "...", "github": "...", "btca": "..." /* omit if btca not used */ },
+    "evidence": { "docs": "...", "priorArt": "...", "productionCode": "...", "source": "..." /* include whichever evidence types you gathered */ },
     "tradeoffs": { "pros": ["..."], "cons": ["..."] },
     "fitReason": "..."
   }
