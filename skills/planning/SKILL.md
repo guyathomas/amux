@@ -36,7 +36,7 @@ The one fixed tool is **Codex** (`gpt-5-codex`) — the second engine for EVALUA
 
 ## Dual-engine standard
 
-Where this skill calls the `codex` MCP tool, use `model: gpt-5-codex`, `sandbox: read-only`, `cwd:` the repo root. Treat Codex as **unavailable** if the call throws/times out or returns empty/non-JSON/MCP-error text (e.g. `"Codex CLI Not Found"`) — then proceed Claude-only.
+Where this skill calls the `codex` MCP tool, use `model: gpt-5-codex`, `sandbox: read-only`, `cwd:` the repo root, and begin the prompt with `/fast`. Treat Codex as **unavailable** if the call throws/times out or returns empty/non-JSON/MCP-error text (e.g. `"Codex CLI Not Found"`) — then proceed Claude-only.
 
 ## State Persistence
 
@@ -167,7 +167,7 @@ Write to `plans/{slug}/claude-eval.json`.
 
 **Step 2 — Codex evaluation via MCP:**
 
-Call the `codex` MCP tool per the **dual-engine standard** (see top), with `prompt`: include the contents of `approaches.json` and ask Codex to evaluate each approach for feasibility, risks, strengths, and implementation notes, returning the same evaluation JSON with `"engine": "codex"`. Use `@` repo-relative file references (e.g. `@package.json`, `@tsconfig.json`) resolved via `cwd`.
+Call the `codex` MCP tool per the **dual-engine standard** (see top), with `prompt`: begin with `/fast`, include the contents of `approaches.json`, and ask Codex to evaluate each approach for feasibility, risks, strengths, and implementation notes, returning the same evaluation JSON with `"engine": "codex"`. Use `@` repo-relative file references (e.g. `@package.json`, `@tsconfig.json`) resolved via `cwd`.
 
 If valid, write it to `plans/{slug}/codex-eval.json`.
 

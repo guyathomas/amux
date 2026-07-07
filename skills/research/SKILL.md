@@ -155,7 +155,7 @@ Quality guide (favour higher tiers): Tier 1 — .gov, .edu, journals, official d
 <teammate_codex_crossvalidation>
 ## Cross-Validation with Codex
 
-After web research, call the `codex` MCP tool (`model: gpt-5-codex`, `sandbox: read-only`) with prompt: "Research this question: {QUESTION}. Return JSON findings with fields: fact, sourceNote, confidence (high/medium/low). Focus on facts confirmable from training data."
+After web research, call the `codex` MCP tool (`model: gpt-5-codex`, `sandbox: read-only`) with a prompt that begins with `/fast`, then asks: "Research this question: {QUESTION}. Return JSON findings with fields: fact, sourceNote, confidence (high/medium/low). Focus on facts confirmable from training data."
 
 Treat codex as unavailable if the call throws/times out, or returns empty/non-JSON/MCP-error text (e.g. `"Codex CLI Not Found"`) — then return Claude-only findings. If valid JSON, merge per question:
 - **AGREE** (same fact): boost confidence, mark cross-validated.

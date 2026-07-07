@@ -33,7 +33,7 @@ Lenses to consider — pick the ones that fit this change. You decide what's wor
 
 After your Claude review, call the `codex` MCP tool for a second opinion, then merge.
 
-Call `codex` with: `model: gpt-5-codex`, `sandbox: read-only`, `cwd`: repo root from the pipeline; `prompt`: include the git diff and file list, ask Codex to review plan alignment, code quality, and architecture, returning findings as JSON with fields `severity`, `confidence`, `file`, `line`, `issue`, `recommendation`, `category`, using `@` repo-relative file refs resolved via `cwd`.
+Call `codex` with: `model: gpt-5-codex`, `sandbox: read-only`, `cwd`: repo root from the pipeline; `prompt`: begin with `/fast`, include the git diff and file list, ask Codex to review plan alignment, code quality, and architecture, returning findings as JSON with fields `severity`, `confidence`, `file`, `line`, `issue`, `recommendation`, `category`, using `@` repo-relative file refs resolved via `cwd`.
 
 Treat Codex as **unavailable** if the call throws/times out, or the response is empty, non-JSON, or contains MCP error text (e.g. `"Codex CLI Not Found"`). If unavailable, return Claude-only findings with `crossValidated: false` and set `"engines": ["claude"]`.
 
