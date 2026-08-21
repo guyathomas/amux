@@ -25,6 +25,7 @@ Use when:
 Don't use when:
 - No plan artifact exists yet — run the planning skill first
 - The change is a single-line fix with no plan
+- Reviewing implemented code (a git diff) — that's the `code-review` skill (code-review-pipeline)
 </when_to_use>
 
 <workflow>

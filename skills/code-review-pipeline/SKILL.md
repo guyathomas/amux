@@ -1,5 +1,5 @@
 ---
-name: review
+name: code-review
 description: Creates an agent team of parallel dual-engine code reviewers on a diff (working tree, branch, PR, or path), adversarially verifies every finding with an independent dual-engine verifier, and fixes confirmed critical/high issues. Run after implementing a feature or before committing.
 ---
 
@@ -25,6 +25,7 @@ Use when:
 Don't use when:
 - Only config/docs changed (no code to review)
 - Single-line trivial fix
+- The diff only touches plan documents (`plans/*`) — that's a written plan, not code; use the `plan-review` skill
 </when_to_use>
 
 <workflow>
