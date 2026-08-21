@@ -1,18 +1,19 @@
 ---
 name: plan-review
-description: Creates an agent team of parallel dual-engine reviewers on a written plan (plans/{slug}/prd.md), aggregates findings by severity, auto-applies mechanical fixes, and gates scope/approach changes for the user. Run after BUILD-PLAN or standalone on any plan directory. The plan-equivalent of the code-review pipeline.
+description: Creates an agent team of parallel dual-engine reviewers on a written plan (plans/{slug}/prd.md), fact-checks empirical findings with an independent dual-engine verifier, auto-applies verified mechanical fixes, and gates scope/approach changes for the user. Run after BUILD-PLAN or standalone on any plan directory. The plan-equivalent of the code-review pipeline.
 ---
 
 <objective>
-Orchestrate parallel review of a *written plan* — not code — using an agent team of specialist plan reviewers. Each reviewer performs its own Claude analysis and calls `codex` for cross-validation. Read the plan directory, dispatch the four plan reviewers concurrently, aggregate findings, filter low-confidence noise, auto-apply mechanical fixes to the plan, gate scope/approach changes for the user, and converge.
+Orchestrate parallel review of a *written plan* — not code — using an agent team of specialist plan reviewers, then verify what they find before it touches the plan. Each reviewer performs its own Claude analysis and calls `codex` for cross-validation. Read the plan directory, dispatch the four plan reviewers concurrently, dedupe and pool findings, fact-check the empirical ones against the actual repo and current docs, auto-apply only verified mechanical fixes, gate scope/approach judgments for the user, and converge.
 </objective>
 
 <quick_start>
 1. Run after `BUILD-PLAN` produces `plans/{slug}/prd.md`, or standalone via `/plan-review {slug}`
 2. Four reviewers dispatch in parallel — assumptions, completeness, structure, scope
 3. Each cross-validates findings with Codex via the `codex` MCP tool
-4. Mechanical fixes are applied to the plan inline; scope/approach changes are surfaced for the user
-5. Re-review converges until no critical/high findings remain (max 2 rounds)
+4. Empirical findings are fact-checked by independent `core:verify-plan-finding` teammates; judgment findings always route to the user
+5. Only CONFIRMED mechanical fixes are applied to the plan; scope/approach changes are surfaced for the user
+6. Re-review converges until no critical/high findings remain (max 2 rounds)
 </quick_start>
 
 <when_to_use>
@@ -24,6 +25,7 @@ Use when:
 Don't use when:
 - No plan artifact exists yet — run the planning skill first
 - The change is a single-line fix with no plan
+- Reviewing implemented code (a git diff) — that's the `code-review` skill (code-review-pipeline)
 </when_to_use>
 
 <workflow>
@@ -54,7 +56,7 @@ Always dispatch all four — unlike code review, the plan reviewers aren't file-
 
 **Announce:** `"Dispatching plan reviewers: assumptions, completeness, structure, scope. Each cross-validates with Codex via the codex MCP tool."`
 
-Spawn all four as teammates in a single request. Use Opus for each.
+Spawn all four as teammates in a single request; their agent definitions pin the model.
 
 For EACH teammate, provide:
 1. The reviewer role name (from the table)
@@ -97,7 +99,7 @@ After your Claude review, get a second opinion from Codex and merge.
 1. Call the `codex` MCP tool with `model: gpt-5-codex`, `sandbox: read-only`, `cwd: {repo_root}`. Prompt: include the plan artifacts, ask Codex to critique the plan for your lenses, returning findings as JSON (fields `severity`, `confidence`, `section`, `lens`, `issue`, `recommendation`, `category`, `applyMode`) using `@` repo-relative file refs (e.g. `@plans/{slug}/prd.md`) resolved via `cwd`.
 2. Treat Codex as **unavailable** if the call throws/times out, or the response is empty, non-JSON, or contains MCP error text (e.g. `"Codex CLI Not Found"`). If unavailable, return Claude-only findings with `crossValidated: false` and `"engines": ["claude"]`.
 3. If Codex returned valid JSON, merge by `section` + semantic similarity:
-   - **AGREE** — both found it → `crossValidated: true`, confidence = max(claude, codex) + 10 (cap 100)
+   - **AGREE** — both found it → `crossValidated: true`, confidence = max(claude, codex). Agreement is a display signal, not a score bump — two engines can share a blind spot, and verification is the gate.
    - **CHALLENGE** — same section, differing severity → keep higher, set `severityDispute: true`
    - **COMPLEMENT** — one engine only → include with `crossValidated: false`
 </collab_standard>
@@ -117,31 +119,43 @@ Pick the tools installed in your environment that fit; none are mandatory.
 
 <phase name="AGGREGATE">
 1. Collect JSON responses from all four reviewer teammates (if malformed, skip with a warning).
-2. **Filter:** remove findings with `confidence < 80`.
-3. **Group by severity:** critical (must fix before building) / high (should fix) / medium (worth considering) / low (minor).
-4. **Split by `applyMode`:**
-   - **auto** — mechanical tightening: clarity, missing exit criteria, error-path steps, gate reordering/right-sizing, sharpening RED tests, trimming gold-plating within a gate.
+2. **Dedupe across reviewers:** pool all findings and merge duplicates by `section` + semantic similarity (completeness and structure especially overlap). Keep the highest severity; union the `engines` lists.
+3. **Pre-filter:** discard findings with `confidence < 50` — obvious noise not worth a verifier spawn. Self-reported confidence is NOT the quality gate; verification is.
+4. **Group by severity:** critical (must fix before building) / high (should fix) / medium (worth considering) / low (minor).
+5. **Split by `applyMode`:**
+   - **auto** — mechanical tightening: clarity, missing exit criteria, error-path steps, gate reordering, sharpening RED tests. (Right-sizing and trimming gold-plating are judgment calls — VERIFY forces those to `confirm`.)
    - **confirm** — anything that changes scope or the selected approach (scope additions/cuts, simpler-approach swaps, new phases). These never get applied silently.
-5. **Highlight cross-validated** findings (`crossValidated: true`) — confirmed by both engines, but treat agreement as *moderate* confidence, not ground truth.
 6. **Surface disagreements** (`severityDispute: true` / `classification: CHALLENGE`) separately — cross-model gain concentrates where engines diverge; these are the highest-value items to inspect.
 7. **Collect the assumption ledger** from the assumptions reviewer — list every `guessed` load-bearing assumption as a pre-build verification task.
-8. Compute `buildReady = true` only if no critical/high findings remain across all reviewers.
+8. Compute `buildReady = true` only if no critical/high findings remain across all reviewers (after VERIFY drops the refuted ones).
+</phase>
+
+<phase name="VERIFY">
+Plan findings split into two kinds, and only one of them can be adversarially verified:
+
+**1. Empirical findings — claims about reality.** Lenses `assumption-audit`, `codebase-fit`, `evidence-freshness`, and structural claims that are checkable against the plan text (dependency ordering, missing exit criteria, unreal RED tests). Either the file exists or it doesn't; either gate 3 consumes gate 4's output or it doesn't.
+
+1. Spawn one `core:verify-plan-finding` teammate per empirical critical/high/medium finding, all in a single request (parallel). Give each: the finding as JSON, the repository root, and the relevant `prd.md` excerpt. (Low findings pass through as `verdict: PLAUSIBLE` unverified.)
+2. Each verifier fact-checks against the authoritative source — the repo (`Read`/`Grep`), the plan text itself, or current docs (Context7/web) — and independently asks Codex to refute. Verdicts per its agent definition: `CONFIRMED` requires cited evidence; `REFUTED` (either engine, with evidence) is dropped; no evidence → `PLAUSIBLE`.
+3. **Verdict gates applyMode:** only `CONFIRMED` findings may keep `applyMode: auto`. A `PLAUSIBLE` finding marked auto is demoted to `confirm` — an unverified claim never silently edits the plan.
+
+**2. Judgment findings — claims about proportionality.** Lenses `scope-drift`, `over-under-engineering`, `simpler-alternative`, right-sizing calls. These aren't refutable facts; an adversarial verifier would just produce opinion-vs-opinion noise. Do NOT spawn verifiers for them. Instead, force `applyMode: confirm` regardless of what the reviewer tagged — the user is the verifier for judgment calls.
 </phase>
 
 <phase name="ACT">
-### Auto-apply (mechanical findings)
-For each `applyMode: auto` critical/high/medium finding:
+### Auto-apply (CONFIRMED mechanical findings)
+For each finding with `applyMode: auto` AND `verdict: CONFIRMED`:
 1. Read the relevant section of `prd.md` (or `approaches.json`).
 2. Apply the recommendation as an edit to the plan document.
-3. Record what changed.
+3. Record what changed, with the verifier's evidence.
 
-Never auto-apply a `confirm` finding.
+Never auto-apply a `confirm` finding, and never auto-apply a `PLAUSIBLE` or unverified one — the convergence loop must re-review a plan mutated only by verified edits.
 
 ### Gate for the user (scope/approach findings)
 Present every `applyMode: confirm` finding for an explicit decision. These change the user's intent — adding/cutting scope, swapping to a simpler approach. Per the planning skill's rule, never decompose or rewrite a plan's intent the user hasn't blessed. If the user accepts one that invalidates the approach, loop back to the planning skill's FORMULATE/EVALUATE.
 
 ### Converge
-After auto-applying edits, if any critical/high `auto` findings were fixed this round and this is round 1, re-run DISPATCH→AGGREGATE on the updated plan (round 2). Stop when `buildReady` is true or after round 2. Don't loop on `confirm` findings — those wait on the user.
+After auto-applying edits, if any critical/high `auto` findings were fixed this round and this is round 1, re-run DISPATCH→VERIFY on the updated plan (round 2). Stop when `buildReady` is true or after round 2. Don't loop on `confirm` findings — those wait on the user.
 
 ### Persist & present
 Write the merged result to `plans/{slug}/plan-review.json`:
@@ -150,11 +164,12 @@ Write the merged result to `plans/{slug}/plan-review.json`:
   "round": 2,
   "buildReady": true,
   "enginesUsed": ["claude", "codex"],
-  "applied": [{ "section": "gate-3", "change": "reordered before gate-2 (dependency)", "finding": "..." }],
-  "pendingConfirm": [{ "section": "gate-4", "issue": "adds unrequested caching layer", "recommendation": "cut or confirm" }],
+  "applied": [{ "section": "gate-3", "change": "reordered before gate-2 (dependency)", "finding": "...", "verdict": "CONFIRMED", "evidence": "gate-3 step 2 consumes gate-4's migration output (prd.md)" }],
+  "pendingConfirm": [{ "section": "gate-4", "issue": "adds unrequested caching layer", "recommendation": "cut or confirm", "verdict": "judgment" }],
+  "refuted": [{ "section": "gate-2", "issue": "claimed missing rollback step", "refutedBy": "claude", "evidence": "prd.md gate-2 step 4 already specifies rollback" }],
   "guessedAssumptions": [{ "claim": "...", "consequence": "...", "verifyBefore": "gate-3" }],
   "disagreements": [{ "section": "approach", "claude": "high", "codex": "low", "issue": "..." }],
-  "summary": "1 dependency reorder applied; 1 scope addition pending user; 1 assumption to verify."
+  "summary": "1 verified dependency reorder applied; 1 finding refuted; 1 scope addition pending user; 1 assumption to verify."
 }
 ```
 
@@ -163,13 +178,16 @@ Present the summary:
 ```
 ## Plan Review Summary
 
-**Reviewers:** assumptions, completeness, structure, scope (Opus, dual-engine)
+**Reviewers:** assumptions, completeness, structure, scope (dual-engine)  ·  **Verifiers:** 3
 **Plan:** plans/{slug}/  ·  Round 2  ·  Build-ready: yes/no
-**Findings:** 1 critical, 2 high, 3 medium  ·  Cross-validated: 2
+**Findings:** 5 (2 high, 3 medium: 2 confirmed-applied, 2 judgment-pending, 1 unverified)  ·  1 refuted  ·  Cross-validated: 2
 
-### Applied to the plan (mechanical)
-- [high] gate-3 — reordered before gate-2 (depended on its output)
+### Applied to the plan (CONFIRMED mechanical)
+- [high] gate-3 — reordered before gate-2 (depended on its output; evidence: prd.md gate-3 step 2)
 - [medium] gate-2 — added measurable exit criterion
+
+### Refuted (dropped — no action taken)
+- gate-2 — "missing rollback step" — refuted: prd.md gate-2 step 4 already specifies rollback
 
 ### Needs your decision (scope / approach — not applied)
 - [high] gate-4 — adds a caching layer the original ask never mentioned → cut or confirm?
@@ -182,9 +200,9 @@ Present the summary:
 - approach — Claude: high (migration risk); Codex: low
 
 ### Suggestions (medium/low)
-| Severity | Reviewer | Section | Issue | Recommendation | Engines |
-|---|---|---|---|---|---|
-| medium | completeness | gate-2 | no rollback note | add rollback step | claude, codex |
+| Severity | Verdict | Reviewer | Section | Issue | Recommendation | Engines |
+|---|---|---|---|---|---|---|
+| medium | PLAUSIBLE | completeness | gate-5 | no load-test note | add perf check | claude, codex |
 ```
 
 If `buildReady` and no `pendingConfirm`, report "Plan review complete — plan is build-ready." Otherwise ask the user to resolve the pending decisions and verify the flagged assumptions before implementation.
@@ -200,5 +218,6 @@ If `buildReady` and no `pendingConfirm`, report "Plan review complete — plan i
 | No plan directory found | Report "No plan to review — run the planning skill first" and stop |
 | `prd.md` missing (pre-BUILD-PLAN) | Review approach-level only; skip `structure` gate lenses; note in summary |
 | All teammates fail | Report error, suggest running an individual reviewer manually |
-| `codex` unavailable, empty, or error text | Teammates return Claude-only findings (`"engines": ["claude"]`), pipeline continues at lower confidence |
+| Verifier fails or times out | Keep the finding as `PLAUSIBLE` (demoted to `confirm` if it was auto) with a warning — never silently promote or drop |
+| `codex` unavailable, empty, or error text | Teammates return Claude-only findings (`"engines": ["claude"]`); verifiers verify Claude-only; pipeline continues |
 </error_handling>
