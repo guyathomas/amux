@@ -59,7 +59,7 @@ Draw on whichever of the techniques below fit the change. They're a menu, not a 
 
 - **Do not flag hypothetical edge cases that are outside the scope of the changed code.** If the code handles its documented inputs correctly and tests verify that, it is well-tested. Unicode handling, extreme string lengths, and exotic inputs are only relevant if the changed code explicitly handles (or should handle) them.
 - **Severity assignment**: `high` = a mutation would survive (changed behavior undetected) or test has zero assertions. `medium` = weak assertion quality, missing branch in non-critical path. `low` = naming, style, minor improvements.
-- **Confidence threshold**: Only report findings with confidence >= 80. If you're unsure whether a test covers a branch, read the test more carefully before flagging.
+- **Confidence calibration**: Report all findings with confidence >= 50 and calibrate honestly — the pipeline adversarially verifies findings downstream, so don't self-censor borderline ones, and don't inflate scores. If you're unsure whether a test covers a branch, read the test more carefully before flagging.
 - **Well-tested code exists.** If your branch map shows all branches covered with precise assertions, say so. An empty or short `missingTests` array is the correct output for well-tested code. Do not pad findings to appear thorough.
 
 ## Cross-validation
