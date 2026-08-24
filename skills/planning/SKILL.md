@@ -247,6 +247,13 @@ Detect the project's quality commands once, up front: read `package.json` script
 
 Break the work into the fewest gates that each deliver a working vertical slice — small enough to fit one context window (keep tasks small). Every gate is TDD-gated: it opens by writing failing tests and closes only when lint, format, test, and build all pass.
 
+**Per-gate test mix.** Each gate declares which test levels its Red phase uses, chosen from the changes in that gate — not a fixed quota:
+- **Unit** — pure logic, transformations, edge cases. Almost every gate has some.
+- **Integration** — the gate crosses a module/service/DB/API boundary, wires components together, or changes a contract between them.
+- **E2E** — the gate completes a user-visible flow (UI path, CLI invocation, API endpoint end to end). Usually the final gate(s) of a slice; don't force E2E onto internal-only gates.
+
+Prefer the cheapest level that would catch the gate's likely regressions; add a level only when the changes actually exercise it. State the mix and a one-line rationale in the gate so the implementer doesn't have to re-derive it.
+
 Write `plans/{slug}/prd.md`:
 
 ```markdown
@@ -268,9 +275,10 @@ Write `plans/{slug}/prd.md`:
 Execute in order. Do not start a gate until the previous gate's exit criteria are green.
 
 ### Gate 1: [name]
-**Red (tests first):** the failing tests that define "done" for this slice.
+**Test mix:** [unit / integration / E2E — the levels this gate's changes warrant, with one-line rationale]
+**Red (tests first):** the failing tests that define "done" for this slice, at each level in the mix.
 **Green:** the minimum implementation to pass them.
-**Exit criteria:** lint, format, test, build all pass.
+**Exit criteria:** lint, format, test, build all pass — including every level in the test mix.
 
 ### Gate 2: [name]
 ...
@@ -299,6 +307,6 @@ The `core:review-code` agent can read `plans/{slug}/approaches.json` and `state.
 
 ## Red Flags
 
-Never: guess approaches without evidence; present hypothetical (non-sourced) approaches; collapse the options into a single recommendation before the user has chosen; start implementation before the user selects and the plan clears REVIEW-PLAN; skip EVALUATE or REVIEW-PLAN even when Codex is unavailable (Claude-only still adds value); start a gate's implementation before its tests are red, or close a gate with lint, format, test, or build failing.
+Never: guess approaches without evidence; present hypothetical (non-sourced) approaches; collapse the options into a single recommendation before the user has chosen; start implementation before the user selects and the plan clears REVIEW-PLAN; skip EVALUATE or REVIEW-PLAN even when Codex is unavailable (Claude-only still adds value); start a gate's implementation before its tests are red, or close a gate with lint, format, test, or build failing; write a gate with no declared test mix, or a mix that ignores the gate's boundaries (e.g. unit-only for a gate that crosses a service/DB boundary, or no E2E on the gate that completes a user-facing flow).
 
 If a resource is unavailable, note the gap and fall back (e.g. WebSearch) — still deliver evidence-backed approaches. If Codex is unavailable, proceed with Claude-only eval (`enginesUsed: ["claude"]`).
