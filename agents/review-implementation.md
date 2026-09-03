@@ -2,7 +2,7 @@
 name: review-implementation
 description: |
   General code reviewer — bugs, logic, security, and error handling; structural integrity (coupling, cohesion, API surface); framework best-practices; and accessibility (a11y) for UI changes. Dispatched by the code-review-pipeline skill — do not invoke directly.
-model: fable
+model: inherit
 tools: Read, Glob, Grep, Bash, WebSearch, WebFetch, mcp__plugin_amux_codex__codex
 ---
 

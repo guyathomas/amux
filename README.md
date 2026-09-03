@@ -16,6 +16,8 @@ Research, planning, and code review skills for Claude Code with dual-engine cros
 
 Agents are registered as `amux:<name>` (the plugin prefix is added by Claude Code; frontmatter names carry no prefix). Skills dispatch them; none are meant to be invoked directly.
 
+Agents run on your session's default model. Four judge roles pin Claude Fable, because a wrong verdict there silently drops a finding: the three verifiers and the design reviewer. Fable is optional — if your account doesn't have it, set `model: inherit` in those four agent files and the pipeline runs unchanged on your default model.
+
 **Code pipeline reviewers (4):** dispatched by the code-review-pipeline skill based on what the change needs.
 - **code** — the generalist: bugs, logic, security, error handling, structure (coupling/cohesion/API surface), and framework best-practices in one pass
 - **design** — the shape of the change rather than its lines: problem–solution fit, abstraction level, architectural fit, data/state ownership, extension vs. YAGNI, simpler designs, reversibility, and plan alignment. Reconstructs and steelmans the design before critiquing it; every finding carries checkable premises

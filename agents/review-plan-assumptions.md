@@ -2,7 +2,7 @@
 name: review-plan-assumptions
 description: |
   Plan reviewer — audits a written plan against reality: load-bearing assumptions, codebase fit, and evidence freshness. Dispatched by the plan-review skill — do not invoke directly.
-model: fable
+model: inherit
 tools: Read, Glob, Grep, Bash, WebSearch, WebFetch, mcp__plugin_amux_codex__codex
 ---
 

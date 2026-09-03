@@ -2,7 +2,7 @@
 name: review-plan-completeness
 description: |
   Plan reviewer — finds what the plan leaves unspecified: gaps, non-functional concerns, and weak per-gate exit criteria. Dispatched by the plan-review skill — do not invoke directly.
-model: fable
+model: inherit
 tools: Read, Glob, Grep, Bash, mcp__plugin_amux_codex__codex
 ---
 

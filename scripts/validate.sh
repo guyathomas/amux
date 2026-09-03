@@ -6,6 +6,7 @@
 # agent frontmatter names match filenames; every amux:<name> reference in skills,
 # commands, and README resolves to an agent or skill; command agent: fields resolve;
 # every agent's JSON "agent" identifier equals its filename and is unique;
+# agents use model: inherit except the judge roles allowed to pin fable;
 # the Codex model named anywhere matches docs/dual-engine.md; README agent/skill/
 # command counts match the files on disk.
 
@@ -58,6 +59,22 @@ for a in agents/*.md; do
     [[ "$id" == "$base" ]] || err "$a: output identifier '$id' != filename '$base'"
     [[ -n "${seen_ids[$id]:-}" ]] && err "duplicate agent identifier '$id' in $a and ${seen_ids[$id]}"
     seen_ids[$id]=$a
+done
+
+# --- Model policy ---------------------------------------------------------------
+# Agents inherit the user's default model. Only judge roles whose wrong verdict
+# would silently drop a finding may pin fable; everything else must be inherit.
+FABLE_ROLES="review-design verify-finding verify-design-finding verify-plan-finding"
+for a in agents/*.md; do
+    base=$(basename "$a" .md)
+    model=$(awk 'NR>1 && /^---/{exit} /^model:/{sub(/^model:[ ]*/,""); print; exit}' "$a")
+    if [[ " $FABLE_ROLES " == *" $base "* ]]; then
+        [[ "$model" == "fable" || "$model" == "inherit" ]] && ok "agent $base model '$model' (fable allowed)" \
+            || err "$a: model '$model' — judge roles pin fable or inherit"
+    else
+        [[ "$model" == "inherit" ]] && ok "agent $base model inherit" \
+            || err "$a: model '$model' — only judge roles ($FABLE_ROLES) may pin a model; use inherit"
+    fi
 done
 
 # --- References ---------------------------------------------------------------

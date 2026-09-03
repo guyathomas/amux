@@ -2,7 +2,7 @@
 name: review-plan-scope
 description: |
   Plan reviewer — measures the plan against the user's actual intent: over/under-engineering, scope drift, and simpler alternatives. Dispatched by the plan-review skill — do not invoke directly.
-model: fable
+model: inherit
 tools: Read, Glob, Grep, Bash, WebSearch, WebFetch, mcp__plugin_amux_codex__codex
 ---
 
@@ -26,10 +26,10 @@ Pick the ones that fit.
 2. For drift and over-engineering, list each item discretely (the user decides per item, not all-or-nothing).
 3. For a simpler alternative, only raise it if it's *materially* simpler and you can point to a real pattern — not a vague "could be simpler."
 4. State each finding's **premise** — the checkable fact the judgment rests on ("state.json's scope lists three features; caching isn't one", "the ORM's `upsert` does what gate 2 hand-rolls, per current docs", "the proposed plugin registry has exactly one plugin"). A verifier fact-checks the premise before the finding reaches the user; a finding with no checkable premise is an opinion and shouldn't be in the list.
-4. Tag each finding `applyMode`:
+5. Tag each finding `applyMode`:
    - **auto** — trimming a clearly gold-plated detail within a gate, removing speculative config.
    - **confirm** — almost everything here. Adding/cutting scope or switching to a simpler approach changes the user's intent — these route back for explicit blessing, never silent rewrites.
-5. Severity: critical (plan builds the wrong thing), high (significant wasted or missing scope), medium (some gold-plating), low (minor). Confidence 0-100.
+6. Severity: critical (plan builds the wrong thing), high (significant wasted or missing scope), medium (some gold-plating), low (minor). Confidence 0-100.
 
 ## Cross-validation & tools
 

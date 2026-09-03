@@ -2,7 +2,7 @@
 name: review-tests
 description: |
   Reviews test quality, identifies coverage gaps, and flags test antipatterns. Returns list of missing tests. Dispatched by the code-review-pipeline skill — do not invoke directly.
-model: fable
+model: inherit
 tools: Read, Glob, Grep, Bash, mcp__plugin_amux_codex__codex
 ---
 
