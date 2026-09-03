@@ -7,9 +7,9 @@ description: Use before implementing any non-trivial feature - validates approac
 
 ## Overview
 
-Research-first planning. Validate approaches against real documentation, real codebases, and real implementations before writing code. Dual-engine evaluation cross-validates feasibility.
+Research-first planning. Validate approaches against real documentation, real codebases, and real implementations before writing code. Dual-engine evaluation cross-validates feasibility, and a pre-mortem attacks the recommendation before the user sees it.
 
-**Core principle:** No implementation without evidence-backed, cross-validated approach selection.
+**Core principle:** No implementation without evidence-backed, cross-validated approach selection that has survived its own pre-mortem.
 
 **Announce at start:** "I'm using the planning skill to research approaches before implementation."
 
@@ -48,7 +48,9 @@ plans/{slug}/
   approaches.json     # the candidate approaches with evidence
   claude-eval.json    # Claude's evaluation
   codex-eval.json     # Codex's evaluation (or skip marker)
-  merged-eval.json    # merged evaluation result
+  merged-eval.json    # merged evaluation result + pre-mortem of the recommendation
+  spikes.json         # optional: time-boxed experiments that settled open feasibility questions
+  spikes/{name}/      # optional: the throwaway spike code itself — never merged
   plan-review.json    # multi-agent critique of the selected plan
   prd.md              # destination doc: goal, approach, TDD-gated build plan
 ```
@@ -59,7 +61,7 @@ Generate slug from feature name: lowercase, hyphens for spaces, strip special ch
 ```json
 {
   "feature": "description",
-  "phase": "UNDERSTAND|RESEARCH|FORMULATE|EVALUATE|PRESENT|SELECTED|BUILD-PLAN|REVIEW-PLAN",
+  "phase": "UNDERSTAND|RESEARCH|FORMULATE|EVALUATE|SPIKE|PRESENT|SELECTED|BUILD-PLAN|REVIEW-PLAN",
   "timestamp": "ISO-8601",
   "selectedApproach": null
 }
@@ -67,9 +69,9 @@ Generate slug from feature name: lowercase, hyphens for spaces, strip special ch
 
 ## The Process
 
-`UNDERSTAND → RESEARCH → FORMULATE → EVALUATE → PRESENT → SELECTED → BUILD-PLAN → REVIEW-PLAN`
+`UNDERSTAND → RESEARCH → FORMULATE → EVALUATE → [SPIKE] → PRESENT → SELECTED → BUILD-PLAN → REVIEW-PLAN`
 
-The full multi-agent plan critique runs **last**, on the assembled `prd.md` — gate-level lenses (dependency ordering, vertical-slice, right-sizing, real RED tests) need the gates to exist first. A lightweight sanity pass at SELECTED guards against decomposing an obviously-doomed approach.
+SPIKE is optional: it runs only when EVALUATE leaves a feasibility question that research can't settle but a small, time-boxed experiment can. The full multi-agent plan critique runs **last**, on the assembled `prd.md` — gate-level lenses (dependency ordering, vertical-slice, right-sizing, real RED tests) need the gates to exist first. A lightweight sanity pass at SELECTED guards against decomposing an obviously-doomed approach.
 
 ### UNDERSTAND
 
@@ -117,7 +119,11 @@ For each approach, provide:
 - Con: [concrete drawback with source]
 
 **Fits this project because:** [why this works for the specific codebase]
+
+**Ruled out if:** [the concrete evidence that would make this the wrong choice — a constraint it can't meet, a dependency that turns out unsupported, a scale it can't reach]
 ```
+
+State each approach's kill criteria up front, while you have no favorite. They're what EVALUATE's pre-mortem tests against, and an approach whose author can't say what would rule it out hasn't been thought through.
 
 Write `plans/{slug}/approaches.json`:
 ```json
@@ -128,7 +134,8 @@ Write `plans/{slug}/approaches.json`:
     "howItWorks": "description",
     "evidence": { "docs": "...", "priorArt": "...", "productionCode": "...", "source": "..." /* include whichever evidence types you gathered */ },
     "tradeoffs": { "pros": ["..."], "cons": ["..."] },
-    "fitReason": "..."
+    "fitReason": "...",
+    "killCriteria": ["evidence that would rule this approach out"]
   }
 ]
 ```
@@ -137,7 +144,7 @@ Update `state.json` with `phase: "FORMULATE"`.
 
 ### EVALUATE
 
-Dual-engine evaluation of the formulated approaches. Claude evaluates inline, then calls `codex` MCP tool for Codex's perspective, and merges the results.
+Dual-engine evaluation of the formulated approaches. Claude evaluates inline, then calls `codex` MCP tool for Codex's perspective, merges the results, and then attacks the merged recommendation with a pre-mortem before presenting it.
 
 **Step 1 — Claude evaluation:**
 
@@ -217,11 +224,85 @@ Produce merged evaluation:
 }
 ```
 
-Write to `plans/{slug}/merged-eval.json`.
-
 If Codex was unavailable, pass through Claude eval with `"enginesUsed": ["claude"]` and `"confidence": "medium"` (single-engine, lower confidence).
 
+**Step 4 — Pre-mortem (adversarial):**
+
+Two engines agreeing is not proof: both evaluated cooperatively, from the same `approaches.json`, and can share a blind spot. Before the recommendation reaches the user, attack it — with fresh context, not the context that just produced it.
+
+Dispatch one **`amux:premortem`** agent with: `approaches.json` (including each approach's `killCriteria`), the Step 3 merged evaluation, `state.json`, and the repository root. It assumes the recommended approach was built and failed, writes the likely post-mortems, tests each against the gathered evidence and the repo, checks the kill criteria, asks Codex to argue for the strongest alternative, and returns the failure modes that survive (per its agent definition). Codex unavailable → it runs Claude-only and says so.
+
+Act on what comes back:
+- Surviving failure modes become `risks` on the recommended approach, and their mitigations become build-plan input (BUILD-PLAN gives each a gate step or a verification task). A survivor tagged `spikeCandidate` is exactly that — don't carry an empirically testable unknown into PRESENT as a risk when an hour's experiment would turn it into a fact (see SPIKE).
+- If `recommendationShouldChange` is true (a kill criterion met, or an evidence-backed dissent), do not paper over it: change the recommendation, or lower its confidence and set `recommendation.dissent` to the case against. The user chooses with the case against in view.
+
+Record the agent's result under `preMortem` in `merged-eval.json`:
+```json
+{
+  "preMortem": {
+    "target": 1,
+    "failureModes": [
+      { "scenario": "...", "trigger": "...", "evidence": "...", "mitigation": "...", "survives": true, "meetsKillCriterion": false, "spikeCandidate": true }
+    ],
+    "killCriteriaMet": [],
+    "codexDissent": { "forAlternative": 2, "reason": "...", "wouldChangeRecommendation": false },
+    "recommendationChanged": false,
+    "dissent": "the strongest surviving case against, or null",
+    "enginesUsed": ["claude", "codex"]
+  }
+}
+```
+
+Write the full merged evaluation (Step 3 plus `preMortem`) to `plans/{slug}/merged-eval.json`.
+
 Update `state.json` with `phase: "EVALUATE"`.
+
+### SPIKE (optional — only when a feasibility question is still open)
+
+A spike is a time-boxed, throwaway experiment that turns an unknown into a fact. Research answers "what do the docs say"; a spike answers "what actually happens here." Run this phase only when it's earned:
+
+**Triggers (any one):**
+- A surviving pre-mortem failure mode, or a kill criterion, whose evidence is *unknown* rather than *unfavourable* — docs, the repo, and prior art don't settle it, but a small experiment would.
+- The engines CHALLENGE each other on an approach's **feasibility** (not its taste), or the recommendation's `confidence` is `low`/`medium` for a reason that is empirically testable: does the library support X under our version and config; does the API accept Y; is Z within the performance budget; does the existing module tolerate being called that way.
+- Two approaches are otherwise close and the deciding factor is a measurable property (latency, bundle size, migration time).
+
+**Not triggers:** an unknown that a docs lookup or `Grep` settles (go back and look); a judgment call (simpler vs. more flexible — that's the user's); an experiment that would cost a meaningful fraction of the build itself (that's not a spike, it's the first gate — plan it).
+
+**Design each spike adversarially before running it.** Write down, and record in `spikes.json`:
+1. **Question** — one sentence, answerable yes/no or with a number.
+2. **Which approach(es)** it bears on, and which kill criterion or failure mode it tests.
+3. **Falsified if** — the result that would rule the approach out, stated *before* the experiment runs. A spike without a pre-stated failure condition can't fail, so it can't inform anything.
+4. **Time box** — small: a handful of files, no tests, no lint, no polish. If it's blowing the box, the answer is "harder than it looked" — record that and stop.
+5. **Confounds** — what would make a pass meaningless (mocked the thing under test; ran against a different version than production; measured the wrong path). Optionally ask `codex` per the **dual-engine standard** to poke holes in the design: "Would this experiment actually settle the question? What result would pass for the wrong reason?" A spike that passes for the wrong reason is worse than no spike.
+
+**Announce before running:** the spike(s), the question each answers, the falsification criterion, and the time box. Ask the user first if a spike needs credentials, external services, real data, or more than a small time box.
+
+**Run it in isolation.** Spike code lives in `plans/{slug}/spikes/{name}/` (a self-contained script or mini-project) or, if it must touch the repo, in a throwaway git worktree or branch. It is never merged: the real implementation is built through BUILD-PLAN's TDD gates, and the spike's only outputs are its result and what it taught. Capture the evidence — command output, numbers, the error message — not a summary of it.
+
+**Record and act.** Write `plans/{slug}/spikes.json`:
+```json
+[
+  {
+    "name": "streaming-upload-size",
+    "question": "Does the storage SDK stream a 2 GB upload without buffering in memory under Node 22?",
+    "approachIndex": 1,
+    "tests": "kill criterion: memory > 512 MB on large uploads",
+    "falsifiedIf": "RSS exceeds 512 MB during a 2 GB upload",
+    "timeBox": "45 min / 2 files",
+    "location": "plans/{slug}/spikes/streaming-upload-size/",
+    "result": "confirmed|falsified|inconclusive",
+    "evidence": "peak RSS 180 MB over 2 GB upload (spike output, run 2026-09-03)",
+    "confounds": ["local disk, not the production object store — network backpressure untested"],
+    "ranAt": "ISO-8601"
+  }
+]
+```
+Then update the artifacts the result touches:
+- **confirmed** — attach it as `evidence.spike` on the approach in `approaches.json`, raise the approach's feasibility in `merged-eval.json`, and mark the failure mode `survives: false` with the spike as the mitigation.
+- **falsified** — the kill criterion is met: drop or demote the approach in `merged-eval.json` and change the recommendation. If the recommended approach dies and no other holds up, loop back to FORMULATE/EVALUATE with what the spike taught.
+- **inconclusive** — keep the failure mode as a surviving risk and carry it as a pre-build verification task; note the confound that blocked a verdict so REVIEW-PLAN's assumptions reviewer can see it was tried.
+
+Update `state.json` with `phase: "SPIKE"`. If no trigger fires, skip this phase entirely and say so in one line at PRESENT ("no spike needed — feasibility settled by research").
 
 ### PRESENT
 
@@ -229,62 +310,28 @@ Present the candidate approaches to the user with:
 1. The original evidence from RESEARCH
 2. The cross-validated evaluation from EVALUATE (merged-eval.json)
 3. Highlight where engines agreed (strong signal) or disagreed (flag for human decision)
+4. The pre-mortem: the surviving failure modes of the recommended approach, whether any met a kill criterion, and Codex's dissent if it argued for an alternative — the case *against* the recommendation, shown next to the case for it
+5. Spike results, if any ran: the question, the verdict, the evidence, and any confound that limits it — or the one-line note that no spike was needed
 
-State your recommendation, incorporating merge confidence. Wait for user selection before writing any code.
+State your recommendation, incorporating merge confidence and the pre-mortem. A recommendation presented without its surviving failure modes is a sales pitch, not an evaluation. Wait for user selection before writing any code.
 
 ### SELECTED
 
 Record the user's choice:
 - Update `state.json` with `phase: "SELECTED"` and `selectedApproach: N`
 
-**Light sanity pass before decomposing.** Run one quick Claude check on the selected approach against the codebase: is it obviously infeasible (names a module/API that doesn't exist, contradicts a hard constraint)? This is cheap insurance so BUILD-PLAN doesn't decompose a doomed approach. If it trips, loop back to FORMULATE/EVALUATE. The full multi-agent critique comes later, in REVIEW-PLAN. Otherwise proceed to BUILD-PLAN.
+**Light sanity pass before decomposing.** Run one quick Claude check on the selected approach against the codebase: is it obviously infeasible (names a module/API that doesn't exist, contradicts a hard constraint)? If the user picked an approach other than the recommended one, re-read its `killCriteria` and the pre-mortem — the case against the *chosen* approach should be as visible as the case against the recommended one was, and if it carries an open feasibility question that only the recommended approach was spiked for, offer to run SPIKE on it before decomposing. This is cheap insurance so BUILD-PLAN doesn't decompose a doomed approach. If it trips, loop back to FORMULATE/EVALUATE. The full multi-agent critique comes later, in REVIEW-PLAN. Otherwise proceed to BUILD-PLAN.
 
 ### BUILD-PLAN
 
-Turn the selected approach into a destination document the implementer (or an autonomous loop) executes gate by gate. Output a single `prd.md` — a summary of the shared understanding already reached, plus an ordered set of gates. You usually won't need to re-read it.
+Turn the selected approach into the destination document the implementer — or the `build` skill — executes gate by gate: `plans/{slug}/prd.md`, a summary of the understanding already reached plus an ordered set of TDD gates.
 
-Detect the project's quality commands once, up front: read `package.json` scripts (or the repo's Makefile/CI config) for the real lint, format, test, and build commands. Record them in `prd.md` so every gate references the same ones.
+Dispatch one **`amux:build-plan`** agent with the plan directory contents (`state.json`, `approaches.json`, `merged-eval.json` including its `preMortem`, and `spikes.json` if any) and the repository root. It detects the repo's real quality commands, slices the work into the fewest vertical gates that each fit one context window, declares each gate's test mix (unit / integration / E2E, chosen from what the gate changes) with named RED tests, carries every surviving pre-mortem failure mode into a test or verification step, carries spike learnings into gate notes, and writes `prd.md` in the plan's fixed shape (per its agent definition). It stays inside the selected approach and scope; if decomposition shows the approach can't be built as selected, it returns `blockers` instead of a half-plan.
 
-Break the work into the fewest gates that each deliver a working vertical slice — small enough to fit one context window (keep tasks small). Every gate is TDD-gated: it opens by writing failing tests and closes only when lint, format, test, and build all pass.
-
-**Per-gate test mix.** Each gate declares which test levels its Red phase uses, chosen from the changes in that gate — not a fixed quota:
-- **Unit** — pure logic, transformations, edge cases. Almost every gate has some.
-- **Integration** — the gate crosses a module/service/DB/API boundary, wires components together, or changes a contract between them.
-- **E2E** — the gate completes a user-visible flow (UI path, CLI invocation, API endpoint end to end). Usually the final gate(s) of a slice; don't force E2E onto internal-only gates.
-
-Prefer the cheapest level that would catch the gate's likely regressions; add a level only when the changes actually exercise it. State the mix and a one-line rationale in the gate so the implementer doesn't have to re-derive it.
-
-Write `plans/{slug}/prd.md`:
-
-```markdown
-# {Feature}
-
-## Goal
-[2-3 sentences — the shared understanding from UNDERSTAND.]
-
-## Selected approach
-[1-2 sentences; references approach N in approaches.json.]
-
-## Quality commands
-- Lint: `<cmd>`
-- Format: `<cmd>`
-- Test: `<cmd>`
-- Build: `<cmd>`
-
-## Gates
-Execute in order. Do not start a gate until the previous gate's exit criteria are green.
-
-### Gate 1: [name]
-**Test mix:** [unit / integration / E2E — the levels this gate's changes warrant, with one-line rationale]
-**Red (tests first):** the failing tests that define "done" for this slice, at each level in the mix.
-**Green:** the minimum implementation to pass them.
-**Exit criteria:** lint, format, test, build all pass — including every level in the test mix.
-
-### Gate 2: [name]
-...
-```
-
-Update `state.json` with `phase: "BUILD-PLAN"`. Proceed to REVIEW-PLAN before presenting the plan as final — don't ship gates that haven't been stress-tested.
+When it returns:
+- `blockers` non-empty → loop back to FORMULATE/EVALUATE with what it found. Don't present a plan that its own author says can't be built.
+- Otherwise, check `riskCoverage` against `merged-eval.json`: every `survives: true` failure mode must appear. An uncovered one goes back to the agent, not into the plan as a footnote.
+- Update `state.json` with `phase: "BUILD-PLAN"`. Proceed to REVIEW-PLAN before presenting the plan as final — don't ship gates that haven't been stress-tested.
 
 ### REVIEW-PLAN
 
@@ -298,15 +345,16 @@ After it returns, update `state.json` with `phase: "REVIEW-PLAN"` and:
 - Resolve every `pendingConfirm` finding with the user. If one invalidates the approach, loop back to FORMULATE/EVALUATE.
 - Surface the `guessedAssumptions` ledger as pre-build verification tasks.
 - Present the final gate list only once the plan is `buildReady`. Don't decompose or rewrite a plan's intent the user hasn't blessed.
+- Offer the next step: `/amux:build {slug}` executes the gates.
 
 **Replan on failure.** A plan rarely survives first contact with the code. If implementation hits a wall the plan didn't anticipate (wrong assumption, infeasible step, discovered constraint), stop and loop back to FORMULATE/EVALUATE with what you learned rather than forcing the original plan through.
 
-## Plan-to-Review Linkage
+## Hand-off to build and review
 
-The `core:review-code` agent can read `plans/{slug}/approaches.json` and `state.json` to validate that implementation matches the selected approach. When running code review after a planned feature, reference the plan directory.
+Once the plan is `buildReady`, the **`build` skill** executes it: it verifies the `guessedAssumptions` ledger and any inconclusive spikes before the gates that depend on them, runs each gate RED → GREEN → EXIT against the quality commands recorded in `prd.md`, records deviations, and hands back to this skill's FORMULATE/EVALUATE if the plan meets reality and loses. When it finishes, it runs the `code-review-pipeline` skill with the plan directory so the design reviewer checks the implementation against the selected approach and the recorded deviations. If code is reviewed outside that loop, pass `plans/{slug}/` to the pipeline for the same reason.
 
 ## Red Flags
 
-Never: guess approaches without evidence; present hypothetical (non-sourced) approaches; collapse the options into a single recommendation before the user has chosen; start implementation before the user selects and the plan clears REVIEW-PLAN; skip EVALUATE or REVIEW-PLAN even when Codex is unavailable (Claude-only still adds value); start a gate's implementation before its tests are red, or close a gate with lint, format, test, or build failing; write a gate with no declared test mix, or a mix that ignores the gate's boundaries (e.g. unit-only for a gate that crosses a service/DB boundary, or no E2E on the gate that completes a user-facing flow).
+Never: guess approaches without evidence; present hypothetical (non-sourced) approaches; formulate an approach with no kill criteria; present a recommendation without its pre-mortem, or bury a surviving failure mode because both engines liked the approach; run a spike without a pre-stated falsification criterion, spike what a docs lookup would settle, let a spike grow into the implementation, or merge spike code; collapse the options into a single recommendation before the user has chosen; start implementation before the user selects and the plan clears REVIEW-PLAN; skip EVALUATE, the pre-mortem, or REVIEW-PLAN even when Codex is unavailable (Claude-only still adds value); start a gate's implementation before its tests are red, or close a gate with lint, format, test, or build failing; write a gate with no declared test mix, or a mix that ignores the gate's boundaries (e.g. unit-only for a gate that crosses a service/DB boundary, or no E2E on the gate that completes a user-facing flow).
 
 If a resource is unavailable, note the gap and fall back (e.g. WebSearch) — still deliver evidence-backed approaches. If Codex is unavailable, proceed with Claude-only eval (`enginesUsed: ["claude"]`).

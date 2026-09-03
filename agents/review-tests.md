@@ -1,8 +1,8 @@
 ---
-name: core:review-tests
+name: review-tests
 description: |
   Reviews test quality, identifies coverage gaps, and flags test antipatterns. Returns list of missing tests. Dispatched by the code-review-pipeline skill — do not invoke directly.
-model: fable
+model: inherit
 tools: Read, Glob, Grep, Bash, mcp__plugin_amux_codex__codex
 ---
 
@@ -72,7 +72,7 @@ Return ONLY this JSON (no markdown fences, no commentary):
 
 ```
 {
-  "agent": "test-reviewer",
+  "agent": "review-tests",
   "engines": ["claude", "codex"],
   "filesReviewed": ["src/foo.ts", "src/foo.test.ts"],
   "findings": [

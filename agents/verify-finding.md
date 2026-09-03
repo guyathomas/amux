@@ -1,5 +1,5 @@
 ---
-name: core:verify-finding
+name: verify-finding
 description: |
   Adversarial verifier for a single code-review finding. Attempts to refute the claim against the actual code, cross-checks with Codex, and returns a CONFIRMED/PLAUSIBLE/REFUTED verdict with cited evidence. Dispatched by the code-review-pipeline skill — do not invoke directly.
 model: fable

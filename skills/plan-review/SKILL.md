@@ -11,7 +11,7 @@ Orchestrate parallel review of a *written plan* — not code — using an agent 
 1. Run after `BUILD-PLAN` produces `plans/{slug}/prd.md`, or standalone via `/plan-review {slug}`
 2. Four reviewers dispatch in parallel — assumptions, completeness, structure, scope
 3. Each cross-validates findings with Codex via the `codex` MCP tool
-4. Empirical findings are fact-checked by independent `core:verify-plan-finding` teammates; judgment findings always route to the user
+4. Empirical findings are fact-checked by independent `amux:verify-plan-finding` teammates; judgment findings have their *premise* fact-checked and always route to the user for the judgment itself
 5. Only CONFIRMED mechanical fixes are applied to the plan; scope/approach changes are surfaced for the user
 6. Re-review converges until no critical/high findings remain (max 2 rounds)
 </quick_start>
@@ -28,13 +28,17 @@ Don't use when:
 - Reviewing implemented code (a git diff) — that's the `code-review` skill (code-review-pipeline)
 </when_to_use>
 
+<required_tools>
+Reviewers and verifiers run as parallel **agent-team teammates** when `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` is set (the session-start banner says whether it is). Without it, spawn the same roles as ordinary subagents via the Agent tool, all in a single request so they still run in parallel — the roles, prompts, JSON contracts, and verification protocol are identical. Never skip a stage because teams are off.
+</required_tools>
+
 <workflow>
 
 <phase name="LOCATE">
 1. Resolve the plan directory:
    - If a slug/path is given, use `plans/{slug}/`.
    - Else read `plans/*/state.json` and pick the most recently updated, or ask the user which plan.
-2. Read the plan artifacts: `prd.md` (the gates), `approaches.json`, `state.json`, and `merged-eval.json` if present. These are the review target — the equivalent of the git diff.
+2. Read the plan artifacts: `prd.md` (the gates), `approaches.json`, `state.json`, and `merged-eval.json` and `spikes.json` if present. These are the review target — the equivalent of the git diff. Spike results are evidence the assumptions reviewer should credit (a confirmed spike verifies an assumption; an inconclusive one flags it).
 3. Determine the repository root: `git rev-parse --show-toplevel`. Required context for all teammates.
 4. If `prd.md` has no gates yet (review invoked before BUILD-PLAN), note it — the structure reviewer will review only approach-level shape, and gate-level lenses are limited.
 5. Record which round this is (default round 1).
@@ -47,10 +51,10 @@ Create an agent team of four plan reviewers in parallel. Each runs as an indepen
 
 | Reviewer | Teammate role | Owns |
 |---|---|---|
-| assumptions | `core:review-plan-assumptions` | assumption audit, codebase-fit, evidence freshness |
-| completeness | `core:review-plan-completeness` | gap sweep, non-functional coverage, definition-of-done per gate |
-| structure | `core:review-plan-structure` | dependency ordering, vertical-slice, right-sizing, real RED tests |
-| scope | `core:review-plan-scope` | scope-drift, over/under-engineering, simpler alternative |
+| assumptions | `amux:review-plan-assumptions` | assumption audit, codebase-fit, evidence freshness |
+| completeness | `amux:review-plan-completeness` | gap sweep, non-functional coverage, definition-of-done per gate |
+| structure | `amux:review-plan-structure` | dependency ordering, vertical-slice, right-sizing, real RED tests |
+| scope | `amux:review-plan-scope` | scope-drift, over/under-engineering, simpler alternative |
 
 Always dispatch all four — unlike code review, the plan reviewers aren't file-type gated; every plan benefits from all four lenses. (Skip a reviewer only if its inputs are entirely absent, e.g. skip `structure` when there are no gates.)
 
@@ -60,7 +64,7 @@ Spawn all four as teammates in a single request; their agent definitions pin the
 
 For EACH teammate, provide:
 1. The reviewer role name (from the table)
-2. The full contents of the plan artifacts (`prd.md`, `approaches.json`, `state.json`, `merged-eval.json`)
+2. The full contents of the plan artifacts (`prd.md`, `approaches.json`, `state.json`, `merged-eval.json`, and `spikes.json` if present)
 3. The **repository root path**
 4. The two shared blocks below (`<collab_standard>` and `<tools_menu>`) — the agent definitions reference these rather than restating them, so they must be injected here.
 
@@ -82,8 +86,11 @@ plans/{slug}/
 ## state.json (UNDERSTAND-phase scope, selected approach)
 {state_contents}
 
-## merged-eval.json (approaches that were compared)
+## merged-eval.json (approaches that were compared, with pre-mortem)
 {merged_eval_contents}
+
+## spikes.json (experiments that settled feasibility questions — omit if none)
+{spikes_contents}
 
 {collab_standard}
 
@@ -135,11 +142,15 @@ Plan findings split into two kinds, and only one of them can be adversarially ve
 
 **1. Empirical findings — claims about reality.** Lenses `assumption-audit`, `codebase-fit`, `evidence-freshness`, and structural claims that are checkable against the plan text (dependency ordering, missing exit criteria, unreal RED tests). Either the file exists or it doesn't; either gate 3 consumes gate 4's output or it doesn't.
 
-1. Spawn one `core:verify-plan-finding` teammate per empirical critical/high/medium finding, all in a single request (parallel). Give each: the finding as JSON, the repository root, and the relevant `prd.md` excerpt. (Low findings pass through as `verdict: PLAUSIBLE` unverified.)
+1. Spawn one `amux:verify-plan-finding` teammate per empirical critical/high/medium finding, all in a single request (parallel). Give each: the finding as JSON, the repository root, and the relevant `prd.md` excerpt. (Low findings pass through as `verdict: PLAUSIBLE` unverified.)
 2. Each verifier fact-checks against the authoritative source — the repo (`Read`/`Grep`), the plan text itself, or current docs (Context7/web) — and independently asks Codex to refute. Verdicts per its agent definition: `CONFIRMED` requires cited evidence; `REFUTED` (either engine, with evidence) is dropped; no evidence → `PLAUSIBLE`.
 3. **Verdict gates applyMode:** only `CONFIRMED` findings may keep `applyMode: auto`. A `PLAUSIBLE` finding marked auto is demoted to `confirm` — an unverified claim never silently edits the plan.
 
-**2. Judgment findings — claims about proportionality.** Lenses `scope-drift`, `over-under-engineering`, `simpler-alternative`, right-sizing calls. These aren't refutable facts; an adversarial verifier would just produce opinion-vs-opinion noise. Do NOT spawn verifiers for them. Instead, force `applyMode: confirm` regardless of what the reviewer tagged — the user is the verifier for judgment calls.
+**2. Judgment findings — claims about proportionality.** Lenses `scope-drift`, `over-under-engineering`, `simpler-alternative`, right-sizing calls. The judgment itself isn't a refutable fact — arguing "too much abstraction" against "about right" is opinion-vs-opinion noise, and the user is the verifier for that. But every judgment finding rests on a **premise** that *is* checkable: "the original ask never mentioned X" (checkable against `state.json`'s UNDERSTAND scope), "a simpler library-native pattern exists" (checkable against current docs), "this abstraction has one consumer" (checkable against the repo).
+
+1. For each critical/high judgment finding, spawn a `amux:verify-plan-finding` teammate with the finding's `premise` (the scope reviewer supplies one; for other judgment findings, extract the factual claim the recommendation depends on) and the instruction to verify **the premise only**. Medium/low judgment findings pass through unverified as `PLAUSIBLE`.
+2. A **REFUTED premise drops the finding** — the user should not be asked to rule on cutting a "scope addition" the original ask actually requested, or on switching to a "simpler pattern" the library doesn't offer. List it in the refuted section with the evidence.
+3. Everything else keeps `applyMode: confirm` regardless of verdict. Verification filters the noise out of the user's decision list; it never makes the decision. Do not spawn verifiers to argue the proportionality call itself.
 </phase>
 
 <phase name="ACT">
