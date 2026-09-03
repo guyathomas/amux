@@ -228,24 +228,26 @@ If Codex was unavailable, pass through Claude eval with `"enginesUsed": ["claude
 
 **Step 4 — Pre-mortem (adversarial):**
 
-Two engines agreeing is not proof: both evaluated cooperatively, from the same `approaches.json`, and can share a blind spot. Before the recommendation reaches the user, attack it.
+Two engines agreeing is not proof: both evaluated cooperatively, from the same `approaches.json`, and can share a blind spot. Before the recommendation reaches the user, attack it — with fresh context, not the context that just produced it.
 
-1. **Claude pre-mortem.** Assume the recommended approach was built and failed. Write the most likely post-mortems (usually 2-4): for each, the failure scenario, what triggers it, the evidence gathered in RESEARCH (docs, repo, prior art) that makes it likely or unlikely, and the mitigation if one exists. Check the recommended approach against its own `killCriteria` from FORMULATE — does any evidence already on hand meet one?
-2. **Codex dissent.** Call `codex` per the **dual-engine standard** with `prompt`: "Approach {N} was recommended over the others in `approaches.json` (contents included). Argue the strongest case AGAINST approach {N} and FOR the strongest alternative, citing `@` repo files and the evidence in the approaches. Return JSON: `{ "against": [{ "scenario": "...", "trigger": "...", "evidence": "..." }], "forAlternative": { "index": 2, "reason": "..." }, "wouldChangeRecommendation": true|false }`." If unavailable, the pre-mortem is Claude-only — say so.
-3. **Judge what survives.** A failure mode survives when neither engine could cite evidence that mitigates it; one that is mitigated by cited evidence is recorded as addressed. Then:
-   - Surviving failure modes become `risks` on the recommended approach, and their mitigations become build-plan input (BUILD-PLAN should give each a gate step or a verification task). A surviving failure mode that a small experiment could settle — "does the library actually do X under our config", "is Y fast enough" — is a SPIKE candidate; don't carry an empirically testable unknown into PRESENT as a risk when an hour's experiment would turn it into a fact.
-   - If a surviving failure mode meets a kill criterion, or Codex's dissent is evidence-backed and `wouldChangeRecommendation` is true, do not paper over it: either change the recommendation or lower its confidence and set `recommendation.dissent` to the case against. The user chooses with the case against in view.
+Dispatch one **`amux:premortem`** agent with: `approaches.json` (including each approach's `killCriteria`), the Step 3 merged evaluation, `state.json`, and the repository root. It assumes the recommended approach was built and failed, writes the likely post-mortems, tests each against the gathered evidence and the repo, checks the kill criteria, asks Codex to argue for the strongest alternative, and returns the failure modes that survive (per its agent definition). Codex unavailable → it runs Claude-only and says so.
 
-Record it in `merged-eval.json`:
+Act on what comes back:
+- Surviving failure modes become `risks` on the recommended approach, and their mitigations become build-plan input (BUILD-PLAN gives each a gate step or a verification task). A survivor tagged `spikeCandidate` is exactly that — don't carry an empirically testable unknown into PRESENT as a risk when an hour's experiment would turn it into a fact (see SPIKE).
+- If `recommendationShouldChange` is true (a kill criterion met, or an evidence-backed dissent), do not paper over it: change the recommendation, or lower its confidence and set `recommendation.dissent` to the case against. The user chooses with the case against in view.
+
+Record the agent's result under `preMortem` in `merged-eval.json`:
 ```json
 {
   "preMortem": {
     "target": 1,
     "failureModes": [
-      { "scenario": "...", "trigger": "...", "evidence": "...", "mitigation": "...", "survives": true, "meetsKillCriterion": false }
+      { "scenario": "...", "trigger": "...", "evidence": "...", "mitigation": "...", "survives": true, "meetsKillCriterion": false, "spikeCandidate": true }
     ],
+    "killCriteriaMet": [],
     "codexDissent": { "forAlternative": 2, "reason": "...", "wouldChangeRecommendation": false },
     "recommendationChanged": false,
+    "dissent": "the strongest surviving case against, or null",
     "enginesUsed": ["claude", "codex"]
   }
 }
@@ -322,54 +324,14 @@ Record the user's choice:
 
 ### BUILD-PLAN
 
-Turn the selected approach into a destination document the implementer (or an autonomous loop) executes gate by gate. Output a single `prd.md` — a summary of the shared understanding already reached, plus an ordered set of gates. You usually won't need to re-read it.
+Turn the selected approach into the destination document the implementer — or the `build` skill — executes gate by gate: `plans/{slug}/prd.md`, a summary of the understanding already reached plus an ordered set of TDD gates.
 
-Detect the project's quality commands once, up front: read `package.json` scripts (or the repo's Makefile/CI config) for the real lint, format, test, and build commands. Record them in `prd.md` so every gate references the same ones.
+Dispatch one **`amux:build-plan`** agent with the plan directory contents (`state.json`, `approaches.json`, `merged-eval.json` including its `preMortem`, and `spikes.json` if any) and the repository root. It detects the repo's real quality commands, slices the work into the fewest vertical gates that each fit one context window, declares each gate's test mix (unit / integration / E2E, chosen from what the gate changes) with named RED tests, carries every surviving pre-mortem failure mode into a test or verification step, carries spike learnings into gate notes, and writes `prd.md` in the plan's fixed shape (per its agent definition). It stays inside the selected approach and scope; if decomposition shows the approach can't be built as selected, it returns `blockers` instead of a half-plan.
 
-Break the work into the fewest gates that each deliver a working vertical slice — small enough to fit one context window (keep tasks small). Every gate is TDD-gated: it opens by writing failing tests and closes only when lint, format, test, and build all pass.
-
-Carry the pre-mortem forward: each surviving failure mode in `merged-eval.json` gets a home in the plan — a RED test that would catch it, a verification step before the gate that depends on it, or an explicit note in the gate's exit criteria. A risk the plan knows about and doesn't test for is a risk the implementer will rediscover the hard way.
-
-Carry the spikes forward too, as knowledge rather than code: what a spike learned (the API shape that worked, the config that was needed, the gotcha it hit) goes into the notes of the gate that builds the real thing, and a confirmed spike's scenario usually becomes that gate's RED test. Spike code itself stays in `plans/{slug}/spikes/` — the gate rebuilds it properly, tests first.
-
-**Per-gate test mix.** Each gate declares which test levels its Red phase uses, chosen from the changes in that gate — not a fixed quota:
-- **Unit** — pure logic, transformations, edge cases. Almost every gate has some.
-- **Integration** — the gate crosses a module/service/DB/API boundary, wires components together, or changes a contract between them.
-- **E2E** — the gate completes a user-visible flow (UI path, CLI invocation, API endpoint end to end). Usually the final gate(s) of a slice; don't force E2E onto internal-only gates.
-
-Prefer the cheapest level that would catch the gate's likely regressions; add a level only when the changes actually exercise it. State the mix and a one-line rationale in the gate so the implementer doesn't have to re-derive it.
-
-Write `plans/{slug}/prd.md`:
-
-```markdown
-# {Feature}
-
-## Goal
-[2-3 sentences — the shared understanding from UNDERSTAND.]
-
-## Selected approach
-[1-2 sentences; references approach N in approaches.json.]
-
-## Quality commands
-- Lint: `<cmd>`
-- Format: `<cmd>`
-- Test: `<cmd>`
-- Build: `<cmd>`
-
-## Gates
-Execute in order. Do not start a gate until the previous gate's exit criteria are green.
-
-### Gate 1: [name]
-**Test mix:** [unit / integration / E2E — the levels this gate's changes warrant, with one-line rationale]
-**Red (tests first):** the failing tests that define "done" for this slice, at each level in the mix.
-**Green:** the minimum implementation to pass them.
-**Exit criteria:** lint, format, test, build all pass — including every level in the test mix.
-
-### Gate 2: [name]
-...
-```
-
-Update `state.json` with `phase: "BUILD-PLAN"`. Proceed to REVIEW-PLAN before presenting the plan as final — don't ship gates that haven't been stress-tested.
+When it returns:
+- `blockers` non-empty → loop back to FORMULATE/EVALUATE with what it found. Don't present a plan that its own author says can't be built.
+- Otherwise, check `riskCoverage` against `merged-eval.json`: every `survives: true` failure mode must appear. An uncovered one goes back to the agent, not into the plan as a footnote.
+- Update `state.json` with `phase: "BUILD-PLAN"`. Proceed to REVIEW-PLAN before presenting the plan as final — don't ship gates that haven't been stress-tested.
 
 ### REVIEW-PLAN
 

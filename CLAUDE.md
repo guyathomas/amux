@@ -18,7 +18,7 @@ A Claude Code plugin: skills, agents, commands, and hooks. There is no build ste
 - Skills don't prescribe research MCPs; they use whatever the environment provides. Don't hard-code tool names beyond `codex` and the built-ins.
 - Codex is optional everywhere: every path has a Claude-only fallback and says so.
 - Agent teams are optional: teammates fall back to subagents with the same roles and protocol.
-- Agents use `model: inherit` (the user's default model). Pin `fable` only where a wrong verdict silently drops a finding — the three verifiers and the design reviewer. `scripts/validate.sh` enforces that list. Fable is optional: if it isn't available in an account, those four files can be switched to `inherit` and everything still works.
+- Agents use `model: inherit` (the user's default model). Pin `fable` only where the work is highest-value judgment: the three verifiers and the design reviewer (a wrong verdict silently drops a finding), the pre-mortem, and the build-plan writer. `scripts/validate.sh` enforces that list. Fable is optional: if it isn't available in an account, those files can be switched to `inherit` and everything still works.
 
 ## Before committing
 

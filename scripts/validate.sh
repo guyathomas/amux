@@ -64,7 +64,7 @@ done
 # --- Model policy ---------------------------------------------------------------
 # Agents inherit the user's default model. Only judge roles whose wrong verdict
 # would silently drop a finding may pin fable; everything else must be inherit.
-FABLE_ROLES="review-design verify-finding verify-design-finding verify-plan-finding"
+FABLE_ROLES="review-design verify-finding verify-design-finding verify-plan-finding premortem build-plan"
 for a in agents/*.md; do
     base=$(basename "$a" .md)
     model=$(awk 'NR>1 && /^---/{exit} /^model:/{sub(/^model:[ ]*/,""); print; exit}' "$a")

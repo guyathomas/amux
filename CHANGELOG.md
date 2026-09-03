@@ -16,7 +16,8 @@ All notable changes to the amux plugin. Versions follow semver: breaking changes
 
 ### Changed
 - Agents renamed from `core:*` to plain names; skills reference them as `amux:<name>`. Every agent's JSON `agent` identifier now equals its filename.
-- Agents use `model: inherit` (the user's default) instead of all pinning Fable. Only the judge roles — `verify-finding`, `verify-design-finding`, `verify-plan-finding`, `review-design` — pin `fable`; validation enforces the list.
+- Agents use `model: inherit` (the user's default) instead of all pinning Fable. Only the highest-value judgment roles — `verify-finding`, `verify-design-finding`, `verify-plan-finding`, `review-design`, `premortem`, `build-plan` — pin `fable`; validation enforces the list.
+- Planning's pre-mortem and BUILD-PLAN phases are now agents (`premortem`, `build-plan`) instead of inline steps, so the pre-mortem attacks the recommendation from fresh context and the gate plan is written by a pinned model.
 - `verify-plan-finding` no longer hard-codes a docs MCP; it uses whatever docs tool the environment provides.
 - Plan reviewer agents no longer emit `buildReady` (the orchestrator computes it after verification).
 - Codex agreement is a display signal everywhere, not a confidence bump.
