@@ -34,7 +34,7 @@ Don't use when:
 1. Resolve the plan directory:
    - If a slug/path is given, use `plans/{slug}/`.
    - Else read `plans/*/state.json` and pick the most recently updated, or ask the user which plan.
-2. Read the plan artifacts: `prd.md` (the gates), `approaches.json`, `state.json`, and `merged-eval.json` if present. These are the review target — the equivalent of the git diff.
+2. Read the plan artifacts: `prd.md` (the gates), `approaches.json`, `state.json`, and `merged-eval.json` and `spikes.json` if present. These are the review target — the equivalent of the git diff. Spike results are evidence the assumptions reviewer should credit (a confirmed spike verifies an assumption; an inconclusive one flags it).
 3. Determine the repository root: `git rev-parse --show-toplevel`. Required context for all teammates.
 4. If `prd.md` has no gates yet (review invoked before BUILD-PLAN), note it — the structure reviewer will review only approach-level shape, and gate-level lenses are limited.
 5. Record which round this is (default round 1).
@@ -60,7 +60,7 @@ Spawn all four as teammates in a single request; their agent definitions pin the
 
 For EACH teammate, provide:
 1. The reviewer role name (from the table)
-2. The full contents of the plan artifacts (`prd.md`, `approaches.json`, `state.json`, `merged-eval.json`)
+2. The full contents of the plan artifacts (`prd.md`, `approaches.json`, `state.json`, `merged-eval.json`, and `spikes.json` if present)
 3. The **repository root path**
 4. The two shared blocks below (`<collab_standard>` and `<tools_menu>`) — the agent definitions reference these rather than restating them, so they must be injected here.
 
@@ -82,8 +82,11 @@ plans/{slug}/
 ## state.json (UNDERSTAND-phase scope, selected approach)
 {state_contents}
 
-## merged-eval.json (approaches that were compared)
+## merged-eval.json (approaches that were compared, with pre-mortem)
 {merged_eval_contents}
+
+## spikes.json (experiments that settled feasibility questions — omit if none)
+{spikes_contents}
 
 {collab_standard}
 
