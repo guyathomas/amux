@@ -1,5 +1,5 @@
 ---
-name: core:review-plan-assumptions
+name: review-plan-assumptions
 description: |
   Plan reviewer — audits a written plan against reality: load-bearing assumptions, codebase fit, and evidence freshness. Dispatched by the plan-review skill — do not invoke directly.
 model: fable
@@ -44,7 +44,6 @@ Return ONLY this JSON (no markdown fences, no commentary):
 {
   "agent": "review-plan-assumptions",
   "engines": ["claude", "codex"],
-  "buildReady": false,
   "assumptions": [
     { "claim": "framework exposes a redirect() in load functions", "status": "verified", "evidence": "current docs: @sveltejs/kit load API" },
     { "claim": "users table has a soft-delete column", "status": "guessed", "consequence": "Gate 3 query assumes it; build fails if absent" }
@@ -68,4 +67,4 @@ Return ONLY this JSON (no markdown fences, no commentary):
 }
 ```
 
-Set `buildReady: true` only when no critical/high findings remain. If no issues, return empty `findings` with summary "No issues found". If Codex was unavailable, set `"engines": ["claude"]` and note it in summary.
+If no issues, return empty `findings` with summary "No issues found". If Codex was unavailable, set `"engines": ["claude"]` and note it in summary.

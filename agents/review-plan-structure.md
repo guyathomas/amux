@@ -1,5 +1,5 @@
 ---
-name: core:review-plan-structure
+name: review-plan-structure
 description: |
   Plan reviewer — checks the gate graph: dependency ordering, vertical-slice integrity, right-sizing, and whether each gate's TDD tests are real. Dispatched by the plan-review skill — do not invoke directly.
 model: fable
@@ -48,7 +48,6 @@ Return ONLY this JSON (no markdown fences, no commentary):
 {
   "agent": "review-plan-structure",
   "engines": ["claude", "codex"],
-  "buildReady": false,
   "findings": [
     {
       "severity": "critical|high|medium|low",
@@ -68,4 +67,4 @@ Return ONLY this JSON (no markdown fences, no commentary):
 }
 ```
 
-Set `buildReady: true` only when no critical/high findings remain. If no issues, return empty `findings` with summary "No issues found". If Codex was unavailable, set `"engines": ["claude"]` and note it in summary.
+If no issues, return empty `findings` with summary "No issues found". If Codex was unavailable, set `"engines": ["claude"]` and note it in summary.

@@ -1,5 +1,5 @@
 ---
-name: core:review-plan-completeness
+name: review-plan-completeness
 description: |
   Plan reviewer — finds what the plan leaves unspecified: gaps, non-functional concerns, and weak per-gate exit criteria. Dispatched by the plan-review skill — do not invoke directly.
 model: fable
@@ -42,7 +42,6 @@ Return ONLY this JSON (no markdown fences, no commentary):
 {
   "agent": "review-plan-completeness",
   "engines": ["claude", "codex"],
-  "buildReady": false,
   "findings": [
     {
       "severity": "critical|high|medium|low",
@@ -62,4 +61,4 @@ Return ONLY this JSON (no markdown fences, no commentary):
 }
 ```
 
-Set `buildReady: true` only when no critical/high findings remain. If no issues, return empty `findings` with summary "No issues found". If Codex was unavailable, set `"engines": ["claude"]` and note it in summary.
+If no issues, return empty `findings` with summary "No issues found". If Codex was unavailable, set `"engines": ["claude"]` and note it in summary.

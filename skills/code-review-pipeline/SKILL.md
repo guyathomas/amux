@@ -11,7 +11,7 @@ Orchestrate parallel review of both the *implementation* and the *design* of a c
 1. Run `/code-review-pipeline` after making code changes (optionally with a PR number, branch, or path target)
 2. Reviewers dispatch automatically based on file types, diff size, and whether the change makes a structural choice (new module, abstraction, data shape, or dependency → design reviewer)
 3. Each reviewer cross-validates findings with Codex via `codex` MCP tool
-4. Every pooled critical/high/medium finding is adversarially verified by an independent teammate — `core:verify-finding` refutes implementation findings against the code; `core:verify-design-finding` defends the design and checks each design finding's premises. REFUTED findings are dropped
+4. Every pooled critical/high/medium finding is adversarially verified by an independent teammate — `amux:verify-finding` refutes implementation findings against the code; `amux:verify-design-finding` defends the design and checks each design finding's premises. REFUTED findings are dropped
 5. CONFIRMED critical/high implementation findings are fixed inline; surviving design findings are presented as decisions for the user; everything else reported
 </quick_start>
 
@@ -28,6 +28,10 @@ Don't use when:
 - The diff only touches plan documents (`plans/*`) — that's a written plan, not code; use the `plan-review` skill
 </when_to_use>
 
+<required_tools>
+Reviewers and verifiers run as parallel **agent-team teammates** when `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` is set (the session-start banner says whether it is). Without it, spawn the same roles as ordinary subagents via the Agent tool, all in a single request so they still run in parallel — the roles, prompts, JSON contracts, and verification protocol are identical; only the spawning mechanism differs. Never skip a stage because teams are off.
+</required_tools>
+
 <workflow>
 
 <phase name="TARGET">
@@ -39,7 +43,7 @@ Don't use when:
    Anything that isn't a PR number, branch, or path is a focus note — pass it through to reviewers as emphasis, with the default diff.
 2. Determine the repository root: run `git rev-parse --show-toplevel` to get the absolute path. This is required context for all teammates.
 3. If no code files changed, report "No code changes to review" and stop
-4. **Size the pipeline to the diff.** Count changed lines (`git diff --shortstat` on the resolved target). Under ~50 changed lines, the full team rarely earns its cost: dispatch a single `core:review-implementation` teammate (one generalist pass, no lens fan-out) and still run VERIFY on its findings. Above that, run the full pipeline below. This is judgment guidance, not a hard rule — a 30-line auth change deserves the full team; a 200-line generated snapshot doesn't. Diff size says nothing about design, though: a 40-line diff that adds a new module or dependency still gets the `design` reviewer (step 5).
+4. **Size the pipeline to the diff.** Count changed lines (`git diff --shortstat` on the resolved target). Under ~50 changed lines, the full team rarely earns its cost: dispatch a single `amux:review-implementation` teammate (one generalist pass, no lens fan-out), add `amux:review-design` only if the small diff still makes a structural choice or a `plans/{slug}/` exists for it (plan alignment is the design reviewer's job), and still run VERIFY on the findings. Above that, run the full pipeline below. This is judgment guidance, not a hard rule — a 30-line auth change deserves the full team; a 200-line generated snapshot doesn't. Diff size says nothing about design, though: a 40-line diff that adds a new module or dependency still gets the `design` reviewer (step 5).
 5. Decide which reviewers fit this diff. Use judgment about what the change actually needs — the table below is a suggested mapping, not a rule. Skip reviewers that don't apply and add ones the change warrants.
 
 | File pattern / change shape | Reviewers worth considering |
@@ -64,12 +68,12 @@ Create an agent team to run specialist reviewers in parallel. Each reviewer runs
 
 | Category | Teammate role |
 |---|---|
-| code | `core:review-implementation` |
-| design | `core:review-design` |
-| test | `core:review-tests` |
-| docs | `core:review-docs` |
+| code | `amux:review-implementation` |
+| design | `amux:review-design` |
+| test | `amux:review-tests` |
+| docs | `amux:review-docs` |
 
-**Lens fan-out for the `code` reviewer.** A single generalist pass dilutes attention across too many concerns. For a full-pipeline diff, spawn `core:review-implementation` as up to 3 teammates, each with ONE lens injected into its prompt:
+**Lens fan-out for the `code` reviewer.** A single generalist pass dilutes attention across too many concerns. For a full-pipeline diff, spawn `amux:review-implementation` as up to 3 teammates, each with ONE lens injected into its prompt:
 
 | Lens | Focus |
 |---|---|
@@ -168,13 +172,13 @@ The reviewer that produced a finding also graded its own confidence — a number
 1. Take every deduped critical/high/medium finding from AGGREGATE. **Low findings skip verification** — pass them through tagged `verdict: PLAUSIBLE` (not worth a spawn).
 2. Spawn one verifier per finding, all in a single request (they run in parallel). The verifier depends on the finding's kind:
 
-   **Implementation findings → `core:verify-finding`.** The claim is about the code, and the code is ground truth: the verifier tries to refute it. Give each:
+   **Implementation findings → `amux:verify-finding`.** The claim is about the code, and the code is ground truth: the verifier tries to refute it. Give each:
    - The finding as JSON (`severity`, `file`, `line`, `issue`, `recommendation`, `category`)
    - The repository root
    - The diff hunk that triggered the finding
    - For PR/branch targets: the target note from TARGET (head branch and whether it's checked out) — a verifier refuting against the wrong working tree produces false refutations
 
-   **Design findings → `core:verify-design-finding`.** The claim is a judgment, so "refute against the code" doesn't apply directly — but every design finding rests on checkable premises and is beaten by a constraint the reviewer missed. The verifier acts as the design's defense: it tests each `premise`, hunts the plan/tests/docs/adjacent code for the constraint that justifies the design as implemented, tries the proposed alternative on paper, and asks Codex to defend the design. Give each:
+   **Design findings → `amux:verify-design-finding`.** The claim is a judgment, so "refute against the code" doesn't apply directly — but every design finding rests on checkable premises and is beaten by a constraint the reviewer missed. The verifier acts as the design's defense: it tests each `premise`, hunts the plan/tests/docs/adjacent code for the constraint that justifies the design as implemented, tries the proposed alternative on paper, and asks Codex to defend the design. Give each:
    - The finding as JSON (`severity`, `file`, `line`, `issue`, `cost`, `recommendation`, `premise[]`, `lens`)
    - The repository root, the full diff, and the plan directory if one exists
    - The design reviewer's `designSummary` and `steelman`
@@ -245,7 +249,7 @@ Rank most-severe first (verdict breaks ties: CONFIRMED above PLAUSIBLE). Cap the
 If nothing survives verification: report "Review complete — no verified issues found" (still show the design summary and list any refuted findings so the work is visible).
 
 ### Persist the summary
-Write the same summary (fixed, needs-attention, design decisions with the design summary and plan alignment, refuted, suggestions with verdicts, disagreements, stale docs, missing tests — uncapped) to `reviews/{branch}.md`, where `{branch}` is `git rev-parse --abbrev-ref HEAD`. Re-reviewing the same branch overwrites it. This keeps deferred medium/low findings and open design decisions from evaporating when the chat scrolls, and gives the standalone `review-code` agent a record to read alongside `plans/{slug}/`.
+Write the same summary (fixed, needs-attention, design decisions with the design summary and plan alignment, refuted, suggestions with verdicts, disagreements, stale docs, missing tests — uncapped) to `reviews/{branch}.md`, where `{branch}` is `git rev-parse --abbrev-ref HEAD`. Re-reviewing the same branch overwrites it. This keeps deferred medium/low findings and open design decisions from evaporating when the chat scrolls, and gives the `build` skill and later re-reviews a record to read alongside `plans/{slug}/`.
 </phase>
 
 </workflow>

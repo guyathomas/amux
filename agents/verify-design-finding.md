@@ -1,5 +1,5 @@
 ---
-name: core:verify-design-finding
+name: verify-design-finding
 description: |
   Adversarial verifier for a single design finding. Defends the design as implemented, tests the finding's premises against the repo, tries the proposed alternative on paper, cross-checks with Codex, and returns a CONFIRMED/PLAUSIBLE/REFUTED verdict with cited evidence. Dispatched by the code-review-pipeline skill — do not invoke directly.
 model: fable

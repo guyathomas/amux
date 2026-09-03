@@ -383,12 +383,13 @@ After it returns, update `state.json` with `phase: "REVIEW-PLAN"` and:
 - Resolve every `pendingConfirm` finding with the user. If one invalidates the approach, loop back to FORMULATE/EVALUATE.
 - Surface the `guessedAssumptions` ledger as pre-build verification tasks.
 - Present the final gate list only once the plan is `buildReady`. Don't decompose or rewrite a plan's intent the user hasn't blessed.
+- Offer the next step: `/amux:build {slug}` executes the gates.
 
 **Replan on failure.** A plan rarely survives first contact with the code. If implementation hits a wall the plan didn't anticipate (wrong assumption, infeasible step, discovered constraint), stop and loop back to FORMULATE/EVALUATE with what you learned rather than forcing the original plan through.
 
-## Plan-to-Review Linkage
+## Hand-off to build and review
 
-The `core:review-code` agent can read `plans/{slug}/approaches.json` and `state.json` to validate that implementation matches the selected approach. When running code review after a planned feature, reference the plan directory.
+Once the plan is `buildReady`, the **`build` skill** executes it: it verifies the `guessedAssumptions` ledger and any inconclusive spikes before the gates that depend on them, runs each gate RED → GREEN → EXIT against the quality commands recorded in `prd.md`, records deviations, and hands back to this skill's FORMULATE/EVALUATE if the plan meets reality and loses. When it finishes, it runs the `code-review-pipeline` skill with the plan directory so the design reviewer checks the implementation against the selected approach and the recorded deviations. If code is reviewed outside that loop, pass `plans/{slug}/` to the pipeline for the same reason.
 
 ## Red Flags
 

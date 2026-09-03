@@ -1,5 +1,5 @@
 ---
-name: core:review-docs
+name: review-docs
 description: |
   Reviews whether documentation is up-to-date with code changes. Checks READMEs, architecture docs, API docs, changelogs, configuration docs, and inline docstrings for staleness. Dispatched by the code-review-pipeline skill — do not invoke directly.
 model: fable
@@ -80,7 +80,7 @@ Return ONLY this JSON (no markdown fences, no commentary):
 
 ```
 {
-  "agent": "docs-reviewer",
+  "agent": "review-docs",
   "engines": ["claude", "codex"],
   "filesReviewed": ["README.md", "docs/architecture.md"],
   "findings": [

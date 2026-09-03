@@ -1,5 +1,5 @@
 ---
-name: core:review-plan-scope
+name: review-plan-scope
 description: |
   Plan reviewer — measures the plan against the user's actual intent: over/under-engineering, scope drift, and simpler alternatives. Dispatched by the plan-review skill — do not invoke directly.
 model: fable
@@ -43,7 +43,6 @@ Return ONLY this JSON (no markdown fences, no commentary):
 {
   "agent": "review-plan-scope",
   "engines": ["claude", "codex"],
-  "buildReady": false,
   "scopeDrift": {
     "additions": ["Gate 4 adds a caching layer the ask never mentioned"],
     "omissions": ["original ask included CSV export; no gate covers it"]
@@ -68,4 +67,4 @@ Return ONLY this JSON (no markdown fences, no commentary):
 }
 ```
 
-Set `buildReady: true` only when no critical/high findings remain. If no issues, return empty `findings` with summary "No issues found". If Codex was unavailable, set `"engines": ["claude"]` and note it in summary.
+If no issues, return empty `findings` with summary "No issues found". If Codex was unavailable, set `"engines": ["claude"]` and note it in summary.

@@ -16,11 +16,16 @@
 #
 # Skills create task-loop.json when they start and set complete=true when finished.
 # The hook blocks exit while active && !complete, re-injecting continuationPrompt.
+# Opt out per-session: export AMUX_SKIP_TASK_LOOP=1
 
 set -euo pipefail
 
 # Fail-open if jq is not available
 command -v jq >/dev/null 2>&1 || { exit 0; }
+
+# Escape hatch: export AMUX_SKIP_TASK_LOOP=1 to let the session end even while a
+# task-loop.json is active (e.g. a loop that cannot reach completion).
+if [[ "${AMUX_SKIP_TASK_LOOP:-0}" == "1" ]]; then exit 0; fi
 
 # Read hook input from stdin
 HOOK_INPUT=$(cat)

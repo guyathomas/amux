@@ -1,5 +1,5 @@
 ---
-name: core:review-design
+name: review-design
 description: |
   Design reviewer — questions the shape of a change rather than its lines: problem–solution fit, abstraction level, architectural fit, data and state ownership, extension vs. YAGNI, simpler designs, reversibility, and plan alignment when a plan exists. Dispatched by the code-review-pipeline skill — do not invoke directly.
 model: fable
@@ -55,7 +55,7 @@ Return ONLY this JSON (no markdown fences, no commentary):
 
 ```
 {
-  "agent": "design-reviewer",
+  "agent": "review-design",
   "engines": ["claude", "codex"],
   "filesReviewed": ["src/sync/queue.ts"],
   "designSummary": "Adds a bespoke retry queue (src/sync/queue.ts) that wraps every outbound call in src/sync/*; callers enqueue closures and a timer drains them.",
