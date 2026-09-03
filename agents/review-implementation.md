@@ -28,6 +28,8 @@ Lenses to consider — pick the ones that fit this change. You decide what's wor
 - **API surface** — flag unintentional or breaking export changes; for removed exports, verify every consumer is updated in the same diff.
 - **Duplication** — flag changes that re-implement existing functionality that could be reused.
 
+Stay at code level here. Whether the change should have been *shaped* differently at all — a different abstraction, boundary, data model, or approach — is the design reviewer's job (`core:review-design`); it runs alongside you and its findings carry the premises the pipeline verifies. Flag a structural defect in how the code is written, not a preference for a different design.
+
 **Framework best-practices**
 - **Idioms & deprecated APIs** — flag non-idiomatic use of the framework (reactivity, hooks rules, composition API) and deprecated functions/patterns. If unsure of a current best practice, verify against official docs (see suggested tools).
 - **Framework performance & typing** — flag framework-specific antipatterns (unnecessary re-renders, missing keys, reactive misuse), CSS scoping issues, and weak typing of framework constructs (props, events, slots).

@@ -24,7 +24,7 @@ cat <<EOF
 {
   "hookSpecificOutput": {
     "hookEventName": "SessionStart",
-    "additionalContext": "<EXTREMELY_IMPORTANT>\nYou have amux. Use the Skill tool to invoke any skill BEFORE responding.\n\n${engine_status}\n\n**Available skills:**\n- **planning** — Use before implementing non-trivial features (researches approaches against real sources)\n- **research** — Use for deep research requiring 20+ sources with confidence tracking (uses agent teams)\n- **code-review-pipeline** — Use after implementing features to catch bugs, a11y issues, and missing tests (uses agent teams)\n- **plan-review** — Use after writing a plan (plans/{slug}/prd.md) to stress-test it before implementation (uses agent teams)\n\nIf there is a reasonable chance (20%+) a skill applies, invoke it.${warning_message}\n</EXTREMELY_IMPORTANT>"
+    "additionalContext": "<EXTREMELY_IMPORTANT>\nYou have amux. Use the Skill tool to invoke any skill BEFORE responding.\n\n${engine_status}\n\n**Available skills:**\n- **planning** — Use before implementing non-trivial features (researches approaches against real sources)\n- **research** — Use for deep research requiring 20+ sources with confidence tracking (uses agent teams)\n- **code-review-pipeline** — Use after implementing features to review both the implementation (bugs, a11y, missing tests) and the design (right abstraction, architectural fit, plan alignment), with adversarial verification (uses agent teams)\n- **plan-review** — Use after writing a plan (plans/{slug}/prd.md) to stress-test it before implementation (uses agent teams)\n\nIf there is a reasonable chance (20%+) a skill applies, invoke it.${warning_message}\n</EXTREMELY_IMPORTANT>"
   }
 }
 EOF

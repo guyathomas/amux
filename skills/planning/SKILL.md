@@ -7,9 +7,9 @@ description: Use before implementing any non-trivial feature - validates approac
 
 ## Overview
 
-Research-first planning. Validate approaches against real documentation, real codebases, and real implementations before writing code. Dual-engine evaluation cross-validates feasibility.
+Research-first planning. Validate approaches against real documentation, real codebases, and real implementations before writing code. Dual-engine evaluation cross-validates feasibility, and a pre-mortem attacks the recommendation before the user sees it.
 
-**Core principle:** No implementation without evidence-backed, cross-validated approach selection.
+**Core principle:** No implementation without evidence-backed, cross-validated approach selection that has survived its own pre-mortem.
 
 **Announce at start:** "I'm using the planning skill to research approaches before implementation."
 
@@ -48,7 +48,7 @@ plans/{slug}/
   approaches.json     # the candidate approaches with evidence
   claude-eval.json    # Claude's evaluation
   codex-eval.json     # Codex's evaluation (or skip marker)
-  merged-eval.json    # merged evaluation result
+  merged-eval.json    # merged evaluation result + pre-mortem of the recommendation
   plan-review.json    # multi-agent critique of the selected plan
   prd.md              # destination doc: goal, approach, TDD-gated build plan
 ```
@@ -117,7 +117,11 @@ For each approach, provide:
 - Con: [concrete drawback with source]
 
 **Fits this project because:** [why this works for the specific codebase]
+
+**Ruled out if:** [the concrete evidence that would make this the wrong choice — a constraint it can't meet, a dependency that turns out unsupported, a scale it can't reach]
 ```
+
+State each approach's kill criteria up front, while you have no favorite. They're what EVALUATE's pre-mortem tests against, and an approach whose author can't say what would rule it out hasn't been thought through.
 
 Write `plans/{slug}/approaches.json`:
 ```json
@@ -128,7 +132,8 @@ Write `plans/{slug}/approaches.json`:
     "howItWorks": "description",
     "evidence": { "docs": "...", "priorArt": "...", "productionCode": "...", "source": "..." /* include whichever evidence types you gathered */ },
     "tradeoffs": { "pros": ["..."], "cons": ["..."] },
-    "fitReason": "..."
+    "fitReason": "...",
+    "killCriteria": ["evidence that would rule this approach out"]
   }
 ]
 ```
@@ -137,7 +142,7 @@ Update `state.json` with `phase: "FORMULATE"`.
 
 ### EVALUATE
 
-Dual-engine evaluation of the formulated approaches. Claude evaluates inline, then calls `codex` MCP tool for Codex's perspective, and merges the results.
+Dual-engine evaluation of the formulated approaches. Claude evaluates inline, then calls `codex` MCP tool for Codex's perspective, merges the results, and then attacks the merged recommendation with a pre-mortem before presenting it.
 
 **Step 1 — Claude evaluation:**
 
@@ -217,9 +222,34 @@ Produce merged evaluation:
 }
 ```
 
-Write to `plans/{slug}/merged-eval.json`.
-
 If Codex was unavailable, pass through Claude eval with `"enginesUsed": ["claude"]` and `"confidence": "medium"` (single-engine, lower confidence).
+
+**Step 4 — Pre-mortem (adversarial):**
+
+Two engines agreeing is not proof: both evaluated cooperatively, from the same `approaches.json`, and can share a blind spot. Before the recommendation reaches the user, attack it.
+
+1. **Claude pre-mortem.** Assume the recommended approach was built and failed. Write the most likely post-mortems (usually 2-4): for each, the failure scenario, what triggers it, the evidence gathered in RESEARCH (docs, repo, prior art) that makes it likely or unlikely, and the mitigation if one exists. Check the recommended approach against its own `killCriteria` from FORMULATE — does any evidence already on hand meet one?
+2. **Codex dissent.** Call `codex` per the **dual-engine standard** with `prompt`: "Approach {N} was recommended over the others in `approaches.json` (contents included). Argue the strongest case AGAINST approach {N} and FOR the strongest alternative, citing `@` repo files and the evidence in the approaches. Return JSON: `{ "against": [{ "scenario": "...", "trigger": "...", "evidence": "..." }], "forAlternative": { "index": 2, "reason": "..." }, "wouldChangeRecommendation": true|false }`." If unavailable, the pre-mortem is Claude-only — say so.
+3. **Judge what survives.** A failure mode survives when neither engine could cite evidence that mitigates it; one that is mitigated by cited evidence is recorded as addressed. Then:
+   - Surviving failure modes become `risks` on the recommended approach, and their mitigations become build-plan input (BUILD-PLAN should give each a gate step or a verification task).
+   - If a surviving failure mode meets a kill criterion, or Codex's dissent is evidence-backed and `wouldChangeRecommendation` is true, do not paper over it: either change the recommendation or lower its confidence and set `recommendation.dissent` to the case against. The user chooses with the case against in view.
+
+Record it in `merged-eval.json`:
+```json
+{
+  "preMortem": {
+    "target": 1,
+    "failureModes": [
+      { "scenario": "...", "trigger": "...", "evidence": "...", "mitigation": "...", "survives": true, "meetsKillCriterion": false }
+    ],
+    "codexDissent": { "forAlternative": 2, "reason": "...", "wouldChangeRecommendation": false },
+    "recommendationChanged": false,
+    "enginesUsed": ["claude", "codex"]
+  }
+}
+```
+
+Write the full merged evaluation (Step 3 plus `preMortem`) to `plans/{slug}/merged-eval.json`.
 
 Update `state.json` with `phase: "EVALUATE"`.
 
@@ -229,15 +259,16 @@ Present the candidate approaches to the user with:
 1. The original evidence from RESEARCH
 2. The cross-validated evaluation from EVALUATE (merged-eval.json)
 3. Highlight where engines agreed (strong signal) or disagreed (flag for human decision)
+4. The pre-mortem: the surviving failure modes of the recommended approach, whether any met a kill criterion, and Codex's dissent if it argued for an alternative — the case *against* the recommendation, shown next to the case for it
 
-State your recommendation, incorporating merge confidence. Wait for user selection before writing any code.
+State your recommendation, incorporating merge confidence and the pre-mortem. A recommendation presented without its surviving failure modes is a sales pitch, not an evaluation. Wait for user selection before writing any code.
 
 ### SELECTED
 
 Record the user's choice:
 - Update `state.json` with `phase: "SELECTED"` and `selectedApproach: N`
 
-**Light sanity pass before decomposing.** Run one quick Claude check on the selected approach against the codebase: is it obviously infeasible (names a module/API that doesn't exist, contradicts a hard constraint)? This is cheap insurance so BUILD-PLAN doesn't decompose a doomed approach. If it trips, loop back to FORMULATE/EVALUATE. The full multi-agent critique comes later, in REVIEW-PLAN. Otherwise proceed to BUILD-PLAN.
+**Light sanity pass before decomposing.** Run one quick Claude check on the selected approach against the codebase: is it obviously infeasible (names a module/API that doesn't exist, contradicts a hard constraint)? If the user picked an approach other than the recommended one, re-read its `killCriteria` and the pre-mortem — the case against the *chosen* approach should be as visible as the case against the recommended one was. This is cheap insurance so BUILD-PLAN doesn't decompose a doomed approach. If it trips, loop back to FORMULATE/EVALUATE. The full multi-agent critique comes later, in REVIEW-PLAN. Otherwise proceed to BUILD-PLAN.
 
 ### BUILD-PLAN
 
@@ -246,6 +277,8 @@ Turn the selected approach into a destination document the implementer (or an au
 Detect the project's quality commands once, up front: read `package.json` scripts (or the repo's Makefile/CI config) for the real lint, format, test, and build commands. Record them in `prd.md` so every gate references the same ones.
 
 Break the work into the fewest gates that each deliver a working vertical slice — small enough to fit one context window (keep tasks small). Every gate is TDD-gated: it opens by writing failing tests and closes only when lint, format, test, and build all pass.
+
+Carry the pre-mortem forward: each surviving failure mode in `merged-eval.json` gets a home in the plan — a RED test that would catch it, a verification step before the gate that depends on it, or an explicit note in the gate's exit criteria. A risk the plan knows about and doesn't test for is a risk the implementer will rediscover the hard way.
 
 **Per-gate test mix.** Each gate declares which test levels its Red phase uses, chosen from the changes in that gate — not a fixed quota:
 - **Unit** — pure logic, transformations, edge cases. Almost every gate has some.
@@ -307,6 +340,6 @@ The `core:review-code` agent can read `plans/{slug}/approaches.json` and `state.
 
 ## Red Flags
 
-Never: guess approaches without evidence; present hypothetical (non-sourced) approaches; collapse the options into a single recommendation before the user has chosen; start implementation before the user selects and the plan clears REVIEW-PLAN; skip EVALUATE or REVIEW-PLAN even when Codex is unavailable (Claude-only still adds value); start a gate's implementation before its tests are red, or close a gate with lint, format, test, or build failing; write a gate with no declared test mix, or a mix that ignores the gate's boundaries (e.g. unit-only for a gate that crosses a service/DB boundary, or no E2E on the gate that completes a user-facing flow).
+Never: guess approaches without evidence; present hypothetical (non-sourced) approaches; formulate an approach with no kill criteria; present a recommendation without its pre-mortem, or bury a surviving failure mode because both engines liked the approach; collapse the options into a single recommendation before the user has chosen; start implementation before the user selects and the plan clears REVIEW-PLAN; skip EVALUATE, the pre-mortem, or REVIEW-PLAN even when Codex is unavailable (Claude-only still adds value); start a gate's implementation before its tests are red, or close a gate with lint, format, test, or build failing; write a gate with no declared test mix, or a mix that ignores the gate's boundaries (e.g. unit-only for a gate that crosses a service/DB boundary, or no E2E on the gate that completes a user-facing flow).
 
 If a resource is unavailable, note the gap and fall back (e.g. WebSearch) — still deliver evidence-backed approaches. If Codex is unavailable, proceed with Claude-only eval (`enginesUsed: ["claude"]`).

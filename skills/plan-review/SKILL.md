@@ -11,7 +11,7 @@ Orchestrate parallel review of a *written plan* — not code — using an agent 
 1. Run after `BUILD-PLAN` produces `plans/{slug}/prd.md`, or standalone via `/plan-review {slug}`
 2. Four reviewers dispatch in parallel — assumptions, completeness, structure, scope
 3. Each cross-validates findings with Codex via the `codex` MCP tool
-4. Empirical findings are fact-checked by independent `core:verify-plan-finding` teammates; judgment findings always route to the user
+4. Empirical findings are fact-checked by independent `core:verify-plan-finding` teammates; judgment findings have their *premise* fact-checked and always route to the user for the judgment itself
 5. Only CONFIRMED mechanical fixes are applied to the plan; scope/approach changes are surfaced for the user
 6. Re-review converges until no critical/high findings remain (max 2 rounds)
 </quick_start>
@@ -139,7 +139,11 @@ Plan findings split into two kinds, and only one of them can be adversarially ve
 2. Each verifier fact-checks against the authoritative source — the repo (`Read`/`Grep`), the plan text itself, or current docs (Context7/web) — and independently asks Codex to refute. Verdicts per its agent definition: `CONFIRMED` requires cited evidence; `REFUTED` (either engine, with evidence) is dropped; no evidence → `PLAUSIBLE`.
 3. **Verdict gates applyMode:** only `CONFIRMED` findings may keep `applyMode: auto`. A `PLAUSIBLE` finding marked auto is demoted to `confirm` — an unverified claim never silently edits the plan.
 
-**2. Judgment findings — claims about proportionality.** Lenses `scope-drift`, `over-under-engineering`, `simpler-alternative`, right-sizing calls. These aren't refutable facts; an adversarial verifier would just produce opinion-vs-opinion noise. Do NOT spawn verifiers for them. Instead, force `applyMode: confirm` regardless of what the reviewer tagged — the user is the verifier for judgment calls.
+**2. Judgment findings — claims about proportionality.** Lenses `scope-drift`, `over-under-engineering`, `simpler-alternative`, right-sizing calls. The judgment itself isn't a refutable fact — arguing "too much abstraction" against "about right" is opinion-vs-opinion noise, and the user is the verifier for that. But every judgment finding rests on a **premise** that *is* checkable: "the original ask never mentioned X" (checkable against `state.json`'s UNDERSTAND scope), "a simpler library-native pattern exists" (checkable against current docs), "this abstraction has one consumer" (checkable against the repo).
+
+1. For each critical/high judgment finding, spawn a `core:verify-plan-finding` teammate with the finding's `premise` (the scope reviewer supplies one; for other judgment findings, extract the factual claim the recommendation depends on) and the instruction to verify **the premise only**. Medium/low judgment findings pass through unverified as `PLAUSIBLE`.
+2. A **REFUTED premise drops the finding** — the user should not be asked to rule on cutting a "scope addition" the original ask actually requested, or on switching to a "simpler pattern" the library doesn't offer. List it in the refuted section with the evidence.
+3. Everything else keeps `applyMode: confirm` regardless of verdict. Verification filters the noise out of the user's decision list; it never makes the decision. Do not spawn verifiers to argue the proportionality call itself.
 </phase>
 
 <phase name="ACT">

@@ -1,5 +1,5 @@
 ---
-description: "Run the full code review pipeline on your changes. Creates an agent team of parallel reviewers, adversarially verifies findings, and fixes confirmed critical issues."
+description: "Run the full code review pipeline on your changes. Creates an agent team of parallel reviewers covering both the implementation and the design, adversarially verifies findings, fixes confirmed critical implementation issues, and surfaces design decisions for you."
 argument-hint: "[PR# | branch | path | focus notes]"
 ---
 
