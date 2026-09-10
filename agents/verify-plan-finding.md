@@ -22,7 +22,7 @@ You receive one finding as JSON (`severity`, `section`, `lens`, `issue`, `recomm
    - Library/API claims ("this API is deprecated", "the framework already provides this") → current docs, using whatever docs tool your environment provides (the skill prescribes none); web search and fetch of the official docs as the fallback that always works.
    - Original-ask claims ("the user never asked for X", "the ask included CSV export") → `state.json`'s UNDERSTAND-phase scope and the plan's Goal section, read literally.
 2. **Settle it.** Either the column exists or it doesn't; either the plan text says it or it doesn't. Prefer a definitive answer over a hedge.
-3. **Cross-check with Codex.** Call the `codex` MCP tool with `model: gpt-5-codex`, `sandbox: read-only`, `cwd: {repo_root}`. Give it the finding and `@` repo-relative refs (including `@plans/{slug}/prd.md`) and ask it to refute the claim with cited evidence. Treat Codex as unavailable if the call throws/times out, or the response is empty or contains error text — then verify Claude-only and set `enginesUsed: ["claude"]`.
+3. **Cross-check with Codex.** Call the `codex` MCP tool with `model: gpt-6-astra`, `sandbox: read-only`, `cwd: {repo_root}`. Give it the finding and `@` repo-relative refs (including `@plans/{slug}/prd.md`) and ask it to refute the claim with cited evidence. Treat Codex as unavailable if the call throws/times out, or the response is empty or contains error text — then verify Claude-only and set `enginesUsed: ["claude"]`.
 
 ## Verdict rules
 

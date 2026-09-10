@@ -4,11 +4,11 @@ This is the single source of truth for how amux skills and agents use Codex as a
 
 ## Model
 
-`gpt-5-codex`
+`gpt-6-astra`
 
 ## Call
 
-Call the `codex` MCP tool with `model: gpt-5-codex`, `sandbox: read-only`, and `cwd` set to the repository root. Reference repo files with `@` repo-relative paths (e.g. `@src/auth.ts`, `@plans/{slug}/prd.md`) so Codex resolves them via `cwd`. Ask for JSON in the same shape the calling agent returns.
+Call the `codex` MCP tool with `model: gpt-6-astra`, `sandbox: read-only`, and `cwd` set to the repository root. Reference repo files with `@` repo-relative paths (e.g. `@src/auth.ts`, `@plans/{slug}/prd.md`) so Codex resolves them via `cwd`. Ask for JSON in the same shape the calling agent returns.
 
 ## Availability
 
