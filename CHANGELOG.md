@@ -2,6 +2,11 @@
 
 All notable changes to the amux plugin. Versions follow semver: breaking changes to commands, hooks, or artifact formats bump the major version.
 
+## [8.0.1] - 2026-09-09
+
+### Changed
+- Codex model updated from `gpt-5-codex` to `gpt-6-astra` in `docs/dual-engine.md` and every skill/agent that calls the `codex` MCP tool.
+
 ## [8.0.0] - 2026-09-03
 
 ### Added

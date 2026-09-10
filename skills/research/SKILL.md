@@ -158,7 +158,7 @@ Quality guide (favour higher tiers): Tier 1 — .gov, .edu, journals, official d
 <teammate_codex_crossvalidation>
 ## Cross-Validation with Codex
 
-After web research, call the `codex` MCP tool (`model: gpt-5-codex`, `sandbox: read-only`) with prompt: "Research this question: {QUESTION}. Return JSON findings with fields: fact, sourceNote, confidence (high/medium/low). Focus on facts confirmable from training data."
+After web research, call the `codex` MCP tool (`model: gpt-6-astra`, `sandbox: read-only`) with prompt: "Research this question: {QUESTION}. Return JSON findings with fields: fact, sourceNote, confidence (high/medium/low). Focus on facts confirmable from training data."
 
 Treat codex as unavailable if the call throws/times out, or returns empty/non-JSON/MCP-error text (e.g. `"Codex CLI Not Found"`) — then return Claude-only findings. If valid JSON, merge per question:
 - **AGREE** (same fact): mark cross-validated. Agreement is a display signal, not a confidence boost — Codex confirming from training data can share the same stale source; the CHALLENGE phase is the gate.
@@ -234,7 +234,7 @@ You are a challenger teammate. You receive ONE research finding and your only jo
 
 1. **Verify the citation.** Fetch the source. Does it actually say this — same claim, same numbers, same scope, same date? A misquote, an over-generalization from a narrower claim, or a stale figure the source has since updated is a refutation. If the source cites something else, find the primary and check that.
 2. **Search for disconfirming evidence.** Run searches phrased to find the opposite: "{claim} debunked", "{claim} criticism", "{claim} retracted", "{claim} updated {current year}", the competing figure or the rival explanation. Favour Tier 1-2 sources. Note newer data that supersedes the claim.
-3. **Ask Codex for the case against.** Call the `codex` MCP tool (`model: gpt-5-codex`, `sandbox: read-only`) with prompt: "Argue against this claim: {fact}. What is the strongest evidence it is wrong, outdated, or overstated? Return JSON: `{ "objections": [{ "objection": "...", "basis": "..." }] }`." Treat unavailability as in the research standard. A Codex objection is a lead, not evidence — web-confirm it before it counts.
+3. **Ask Codex for the case against.** Call the `codex` MCP tool (`model: gpt-6-astra`, `sandbox: read-only`) with prompt: "Argue against this claim: {fact}. What is the strongest evidence it is wrong, outdated, or overstated? Return JSON: `{ "objections": [{ "objection": "...", "basis": "..." }] }`." Treat unavailability as in the research standard. A Codex objection is a lead, not evidence — web-confirm it before it counts.
 
 **Verdict rules — evidence is the gate:**
 - **REFUTED** requires the fetched source contradicting the finding, or a Tier 1-2 counter-source you cite.

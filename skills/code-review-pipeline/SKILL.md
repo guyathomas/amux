@@ -130,7 +130,7 @@ plans/{slug}/ — read prd.md, approaches.json, and state.json for plan-alignmen
 
 After your Claude review, get a second opinion from Codex and merge.
 
-1. Call the `codex` MCP tool with `model: gpt-5-codex`, `sandbox: read-only`, `cwd: {repo_root}`. Prompt: include the diff + file list, ask for findings as JSON (fields `severity`, `confidence`, `file`, `line`, `issue`, `recommendation`, `category`) using `@` repo-relative file refs (e.g. `@src/auth.ts`) resolved via `cwd`. The design reviewer additionally asks Codex to defend the design as implemented and to propose a materially simpler one.
+1. Call the `codex` MCP tool with `model: gpt-6-astra`, `sandbox: read-only`, `cwd: {repo_root}`. Prompt: include the diff + file list, ask for findings as JSON (fields `severity`, `confidence`, `file`, `line`, `issue`, `recommendation`, `category`) using `@` repo-relative file refs (e.g. `@src/auth.ts`) resolved via `cwd`. The design reviewer additionally asks Codex to defend the design as implemented and to propose a materially simpler one.
 2. Treat Codex as **unavailable** if the call throws/times out, or the response is empty, non-JSON, or contains MCP error text (e.g. `"Codex CLI Not Found"`). If unavailable, return Claude-only findings with `crossValidated: false` and `"engines": ["claude"]`.
 3. If Codex returned valid JSON, merge by `file` + `line` (±3) + semantic similarity:
    - **AGREE** — both found it → `crossValidated: true`, confidence = max(claude, codex). Agreement is a display signal, not a score bump — two engines can share a blind spot, and verification is the gate.

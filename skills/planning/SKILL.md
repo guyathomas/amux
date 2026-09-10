@@ -32,11 +32,11 @@ Kinds of evidence worth gathering:
 - How production codebases structure this; common pitfalls
 - Source-level patterns and conventions from the actual code
 
-The one fixed tool is **Codex** (`gpt-5-codex`) — the second engine for EVALUATE (see the dual-engine standard). Everything else is your choice from what your environment provides.
+The one fixed tool is **Codex** (`gpt-6-astra`) — the second engine for EVALUATE (see the dual-engine standard). Everything else is your choice from what your environment provides.
 
 ## Dual-engine standard
 
-Where this skill calls the `codex` MCP tool, use `model: gpt-5-codex`, `sandbox: read-only`, `cwd:` the repo root. Treat Codex as **unavailable** if the call throws/times out or returns empty/non-JSON/MCP-error text (e.g. `"Codex CLI Not Found"`) — then proceed Claude-only.
+Where this skill calls the `codex` MCP tool, use `model: gpt-6-astra`, `sandbox: read-only`, `cwd:` the repo root. Treat Codex as **unavailable** if the call throws/times out or returns empty/non-JSON/MCP-error text (e.g. `"Codex CLI Not Found"`) — then proceed Claude-only.
 
 ## State Persistence
 
