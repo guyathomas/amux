@@ -1,5 +1,5 @@
 ---
-description: "Run the plan-review pipeline on a written plan. Dispatches parallel dual-engine reviewers, fact-checks empirical findings, auto-applies verified mechanical fixes, and gates scope/approach changes."
+description: "Review a written plan: one reviewer covers assumptions, completeness, structure, and scope; an independent verifier fact-checks the critical and high findings; verified mechanical fixes are applied and scope or approach changes come to you."
 argument-hint: "[plan slug or path — defaults to the most recent plan]"
 ---
 

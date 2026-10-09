@@ -1,367 +1,74 @@
 ---
 name: research
-description: Use when user explicitly requests deep research or comprehensive analysis across many authoritative sources. Creates an agent team for parallel research, adversarially challenges the load-bearing findings with independent teammates that hunt for counter-evidence, gates on answer sufficiency (not a source count), and synthesizes with confidence tracking. NOT for simple questions answerable with a single search.
+description: Use when the user explicitly asks for deep research or comprehensive analysis across many authoritative sources. Decomposes the topic, researches the questions in parallel, has independent challengers try to break the load-bearing findings, iterates until the questions are actually answered, and writes a report with source attribution and confidence. NOT for questions a single search answers.
 ---
 
 <objective>
-Comprehensive research using an agent team, web search, and web scraping. Iteratively decomposes topics, gathers evidence from quality sources via parallel researcher teammates, challenges the findings that matter with independent teammates whose only job is to break them, and synthesizes what survives into structured reports.
-
-Core principle: Decompose questions, research in parallel with an agent team, challenge the load-bearing findings, evaluate confidence, iterate until sufficient, synthesize with source attribution.
+Decompose, research in parallel, challenge what the report will rest on, judge sufficiency, synthesize. Done when every question is answered at medium or better confidence by findings that survived CHALLENGE (or the gaps are documented) and `report.md` is written. Sufficiency is the bar, not a source count, and a finding nobody tried to break is never high confidence.
 </objective>
 
-<success_criteria>
-Done when: `state.json` `phase` is `"DONE"`, every question is answered at `medium`+ confidence by findings that survived CHALLENGE (or remaining gaps are documented as limitations), and `report.md` synthesizes findings with source attribution, conflicts, gaps, and limitations. Sufficiency — not a source count — is the bar, and a finding nobody tried to break doesn't count as high confidence.
-</success_criteria>
+<tools>
+Use whatever search and page-fetch tools your environment provides; the built-in `WebSearch` and `WebFetch` always work, and a richer installed tool is better on JS-rendered pages. Check your tool list before falling back, and use any tools the user's own instructions prefer. Source quality: Tier 1 is .gov, .edu, journals, official docs; Tier 2 is Reuters, AP, BBC, industry publications; Tier 3 is company blogs and Wikipedia; skip forums, social media, and SEO spam. Primary sources beat articles about them.
+</tools>
 
-<when_to_use>
-Use when the user explicitly asks for deep research / comprehensive analysis needing multiple authoritative sources, confidence tracking, and source attribution.
-
-Don't use for simple factual questions a single search answers, or topics too narrow for an 8-question decomposition.
-</when_to_use>
-
-<required_tools>
-| Tool / Feature | Purpose | Required |
-|------|---------|----------|
-| Web search | Run search queries | Yes |
-| Web page fetch/scrape | Pull full page content from sources | Yes |
-| Agent teams | Spawn parallel researcher teammates | Yes |
-
-**Prerequisite:** Agent teams must be enabled (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` in settings or environment).
-
-Tool Selection: Use whatever search and page-fetch tools your environment provides. The built-in `WebSearch` / `WebFetch` always work; if you have a richer search or scrape tool installed, prefer it for better extraction on JS-rendered pages. The skill doesn't prescribe a specific provider — pick what gives the best results for the sources you hit.
-</required_tools>
-
-<state_machine>
-```
-INIT → DECOMPOSE → RESEARCH → CHALLENGE → EVALUATE → [RESEARCH or SYNTHESIZE] → DONE
-```
-
-State File: `research/{slug}/state.json`
+<state>
+`research/{slug}/state.json` (slug: lowercase, hyphens, `a-z0-9-`, at most 50 characters):
 
 ```json
-{
-  "topic": "string",
-  "phase": "INIT|DECOMPOSE|RESEARCH|CHALLENGE|EVALUATE|SYNTHESIZE|DONE",
-  "iteration": 0,
-  "maxIterations": 5,
-  "targetSources": 30,
-  "sourcesGathered": 0,
-  "totalSearches": 0,
-  "teammateCompletions": 0,
-  "codexCompletions": 0,
-  "challengeCompletions": 0,
-  "refutedCount": 0,
-  "findingsCount": 0,
-  "startTime": "ISO-8601 timestamp",
-  "questions": [{"id": 1, "text": "...", "status": "pending|done", "confidence": null}]
-}
+{ "topic": "...", "phase": "DECOMPOSE|RESEARCH|CHALLENGE|EVALUATE|SYNTHESIZE|DONE", "iteration": 1, "maxIterations": 3,
+  "questions": [{ "id": 1, "text": "...", "status": "pending|done", "confidence": null }] }
 ```
 
-Rule: Read `state.json` before acting. Write `state.json` after acting.
-</state_machine>
-
-<task_loop>
-A generic task loop hook prevents the session from ending while `task-loop.json` has `complete: false`, so research isn't abandoned mid-flight.
-
-How it works:
-1. When you try to exit, the hook reads `research/{slug}/task-loop.json`
-2. If `complete` is false, exit is blocked and `continuationPrompt` is re-injected
-3. Once you set `complete: true`, exit is allowed and `completionMessage` is displayed
-
-You manage `task-loop.json` alongside `state.json`. Update `statusMessage` and `continuationPrompt` as progress changes. Set `complete: true` when EVALUATE's sufficiency gate passes **or** the iteration ceiling is hit — both are legitimate exits, so the loop always terminates.
-</task_loop>
-
-<state_recovery>
-On skill invocation, first check for existing state:
-
-1. If `research/{slug}/state.json` exists:
-   - Parse JSON; if invalid, offer to restart
-   - Resume from current `phase`
-   - Notify user: "Resuming research from {phase} phase"
-
-2. Verify state consistency before resuming:
-   - RESEARCH: Ensure pending questions exist
-   - CHALLENGE: Ensure `findings.json` has unchallenged findings (no `verdict`) from this iteration
-   - EVALUATE: Ensure `findings.json` has data
-   - SYNTHESIZE: Ensure all questions marked "done"
-
-3. If inconsistent, offer user choice:
-   - Delete state and restart
-   - Attempt repair (mark incomplete questions as pending)
-</state_recovery>
+`findings.json` holds every finding; `task-loop.json` (`active`, `complete`, `continuationPrompt`, `statusMessage`, `completionMessage`) keeps the session on the job until EVALUATE passes or the iteration ceiling is hit. Read state before acting and write it after each phase. On invocation with existing state, resume from its phase and say so.
+</state>
 
 <steps>
 
-<phase name="INIT">
-1. Generate slug from topic:
-   - Lowercase the topic
-   - Replace spaces with hyphens
-   - Remove special characters (keep only `a-z`, `0-9`, `-`)
-   - Truncate to 50 characters
-   - Example: "AI in Healthcare 2024!" → `ai-in-healthcare-2024`
-
-2. Note which search and page-fetch tools your environment provides (built-in `WebSearch` / `WebFetch` are always available; use a richer installed tool if you have one). No specific provider is required.
-
-3. Create working directory:
-   ```bash
-   mkdir -p research/{slug}
-   ```
-
-4. Set `targetSources` as a rough expectation for the topic's breadth (narrow ~20, standard ~30, broad ~40) and `maxIterations` (default 5). These are signals/backstops, not the completion bar — sufficiency is.
-
-5. Initialize state files:
-
-   state.json: use the schema from `<state_machine>` with `phase: "DECOMPOSE"`, counters at 0, `startTime` set, `questions: []`.
-
-   task-loop.json (activates the generic task loop hook):
-   ```json
-   {
-     "active": true,
-     "complete": false,
-     "continuationPrompt": "Continue researching: {topic}. Check research/{slug}/state.json and continue from its current phase.",
-     "statusMessage": "Research in progress: {topic}",
-     "completionMessage": "Research complete."
-   }
-   ```
-
-   findings.json:
-   ```json
-   []
-   ```
-</phase>
-
 <phase name="DECOMPOSE">
-Decompose the topic into the questions that actually matter for it. Use your judgment on count and framing — cover the angles the topic warrants and skip those it doesn't.
-
-Common angles to draw from (a menu, not a checklist): definition/background, current state, key entities, core mechanisms, evidence and data, criticisms and limitations, comparisons to alternatives, future developments. Add others the specific topic demands.
-
-Add questions to `state.json` with `status="pending"`. Set `phase="RESEARCH"`.
+Decompose the topic into the questions that matter for it; cover the angles the topic warrants (background, current state, mechanisms, evidence, criticisms, alternatives, trajectory) and skip the rest. Add them as `pending`. Set `maxIterations` (default 3; raise it for a broad topic). Initialize the task loop.
 </phase>
 
 <phase name="RESEARCH">
-Create an agent team to research pending questions in parallel. Each teammate independently searches with Claude AND cross-validates with Codex via the `codex` MCP tool.
+Dispatch researchers in parallel, one per pending question, giving closely related questions to one researcher. Each gets the instructions below and returns JSON only.
 
-**Claude teammates:** One per pending question (up to 8 at a time). Each works independently with its own context window. Each teammate also calls the `codex` MCP tool to get Codex's perspective on the same question, providing genuine cross-validation — two engines may surface different sources and perspectives.
-
-Spawn each Claude teammate with these instructions:
-
-<teammate_instructions>
-You are a researcher teammate. Use whatever web search and page-fetch tools you have available (the built-in `WebSearch` / `WebFetch` always work; prefer a richer installed tool if you have one).
-
-**TASK:** {QUESTION}
-
-Run enough searches to answer the question well, then fetch the best sources ("Extract main content and key facts") and extract specific facts with their sources. Continue if a fetch fails. Use your judgment on how many searches and sources are enough.
-
-Quality guide (favour higher tiers): Tier 1 — .gov, .edu, journals, official docs · Tier 2 — Reuters, AP, BBC, industry pubs · Tier 3 — company blogs, Wikipedia · Skip — forums, social media, SEO spam.
-</teammate_instructions>
-
-<teammate_codex_crossvalidation>
-## Cross-Validation with Codex
-
-After web research, call the `codex` MCP tool (`model: gpt-6-astra`, `sandbox: read-only`) with prompt: "Research this question: {QUESTION}. Return JSON findings with fields: fact, sourceNote, confidence (high/medium/low). Focus on facts confirmable from training data."
-
-Treat codex as unavailable if the call throws/times out, or returns empty/non-JSON/MCP-error text (e.g. `"Codex CLI Not Found"`) — then return Claude-only findings. If valid JSON, merge per question:
-- **AGREE** (same fact): mark cross-validated. Agreement is a display signal, not a confidence boost — Codex confirming from training data can share the same stale source; the CHALLENGE phase is the gate.
-- **CHALLENGE** (contradicts web fact): keep web version, document the contradiction.
-- **COMPLEMENT (Codex-only)**: include with `"status": "hypothesis"` (no web citation).
-- **COMPLEMENT (Claude-only)**: keep as-is.
-</teammate_codex_crossvalidation>
-
-<teammate_return_format>
-**RETURN ONLY THIS JSON:**
+<researcher>
+Research this question: {QUESTION}. Run enough searches to answer it well, fetch the best sources, and extract specific facts with their sources. Prefer higher-tier sources; continue past a failed fetch. Return:
 ```json
-{
-  "questionId": {ID},
-  "questionText": "{QUESTION}",
-  "searchQueries": ["query1", "query2", "query3", "query4"],
-  "searchesRun": 4,
-  "urlsScraped": 4,
-  "scrapeFailures": [],
-  "findings": [
-    {
-      "fact": "...",
-      "sourceUrl": "...",
-      "tier": 1,
-      "crossValidated": false,
-      "engines": ["claude"],
-      "status": "confirmed|hypothesis|disputed"
-    }
-  ],
-  "gaps": ["what you couldn't find"],
-  "contradictions": ["X says A, Y says B"],
-  "confidence": "high|medium|low",
-  "confidenceReason": "...",
-  "codexAvailable": true
-}
+{ "questionId": 1, "findings": [{ "fact": "...", "sourceUrl": "...", "tier": 1 }], "gaps": ["..."], "contradictions": ["X says A, Y says B"], "confidence": "high|medium|low", "confidenceReason": "..." }
 ```
-</teammate_return_format>
+</researcher>
 
-After each Claude teammate completes:
-1. Validate JSON. Retry once if malformed.
-2. Append to `findings.json`
-3. Update `state.json`:
-   - Mark question done
-   - Increment `totalSearches` by `searchesRun` from response
-   - Increment `teammateCompletions` by 1
-   - Increment `sourcesGathered` by `urlsScraped` from response
-   - Increment `findingsCount` by length of `findings` array from response
-   - If `codexAvailable` is true, increment `codexCompletions` by 1
-4. Log progress: `"Sources: {sourcesGathered}/{targetSources}"`
-
-After all teammates complete:
-1. Set `phase="CHALLENGE"`
+Append findings to `findings.json`, mark the question done with its confidence, then set `phase: "CHALLENGE"`.
 </phase>
 
 <phase name="CHALLENGE">
-Researcher teammates are motivated to answer, so their findings skew toward whatever confirmed the question's framing — and a Codex "agree" from training data can share the very source that's wrong. Before judging sufficiency, try to break the findings the report will rest on. This is the adversarial stage: the researcher finds, the challenger judges, and the two never share a context window.
+Researchers are motivated to answer, so their findings skew toward whatever confirmed the question's framing. Before judging sufficiency, try to break what the report will rest on. The researcher finds; the challenger judges; they never share a context window.
 
-1. **Select the load-bearing findings** from this iteration's unchallenged entries in `findings.json` (those without a `verdict`): every finding the researcher rated `high` confidence, any `medium` finding that answers a question by itself, and every `status: hypothesis` (Codex-only) finding. Rank by how much the report would change if the finding were wrong; cap at 8 per round (one challenger each). Findings left unchallenged stay eligible only for `medium` confidence or below.
-2. **Spawn one challenger teammate per selected finding**, in parallel, with the instructions below. Challengers get the finding, its source, and the question — never the researcher's reasoning.
-3. **Apply verdicts** to `findings.json`:
-   - **CONFIRMED** — the source says what the finding claims, and real searching found no credible counter-evidence. Eligible for the report's high-confidence tier.
-   - **DISPUTED** — a credible counter-source exists. Keep the finding, attach `counterEvidence`, cap its confidence at `medium`, and route it to the report's Conflicting Information section.
-   - **REFUTED** — the source doesn't say it, or it's retracted or superseded by newer data. Set `status: "refuted"`; it is excluded from synthesis except in the refuted list. Increment `refutedCount`.
-   - **UNSETTLED** — the challenger couldn't check (source unreachable, no counter-search possible). Cap confidence at `medium`; never treat as CONFIRMED.
-4. Update `state.json`: increment `challengeCompletions` and `totalSearches` per challenger; if a REFUTED finding was what answered a question, lower that question's confidence accordingly so EVALUATE re-opens it.
-5. Set `phase="EVALUATE"`.
+1. Select this iteration's load-bearing findings (no `verdict` yet): every high-confidence finding and any medium finding that answers a question by itself. Rank by how much the report changes if the finding is wrong. Group them by source URL, since the citation check is per source, and cap at 4 groups per round; unchallenged findings stay capped at medium confidence.
+2. Dispatch one challenger per group, in parallel, with the instructions below. Challengers get the findings, their source, and the questions, never the researcher's reasoning.
+3. Apply verdicts in `findings.json`: **CONFIRMED** (eligible for high confidence), **DISPUTED** (keep, attach `counterEvidence`, cap at medium, report under Conflicting Information), **REFUTED** (excluded from synthesis except the refuted list; if it answered a question, reopen the question), **UNSETTLED** (cap at medium). Then `phase: "EVALUATE"`.
 
-<challenger_instructions>
-You are a challenger teammate. You receive ONE research finding and your only job is to try to break it. You have no stake in the answer, no attachment to the researcher who found it, and no reason to be polite about a bad source.
-
-**FINDING:** {fact}
-**CLAIMED SOURCE:** {sourceUrl} (tier {tier})
-**QUESTION IT ANSWERS:** {questionText}
-
-1. **Verify the citation.** Fetch the source. Does it actually say this — same claim, same numbers, same scope, same date? A misquote, an over-generalization from a narrower claim, or a stale figure the source has since updated is a refutation. If the source cites something else, find the primary and check that.
-2. **Search for disconfirming evidence.** Run searches phrased to find the opposite: "{claim} debunked", "{claim} criticism", "{claim} retracted", "{claim} updated {current year}", the competing figure or the rival explanation. Favour Tier 1-2 sources. Note newer data that supersedes the claim.
-3. **Ask Codex for the case against.** Call the `codex` MCP tool (`model: gpt-6-astra`, `sandbox: read-only`) with prompt: "Argue against this claim: {fact}. What is the strongest evidence it is wrong, outdated, or overstated? Return JSON: `{ "objections": [{ "objection": "...", "basis": "..." }] }`." Treat unavailability as in the research standard. A Codex objection is a lead, not evidence — web-confirm it before it counts.
-
-**Verdict rules — evidence is the gate:**
-- **REFUTED** requires the fetched source contradicting the finding, or a Tier 1-2 counter-source you cite.
-- **DISPUTED** requires a credible counter-source you cite.
-- **CONFIRMED** requires the source verified verbatim AND real searching for the opposite that came up empty.
-- **UNSETTLED** otherwise. Don't inflate to CONFIRMED because you found nothing in one search.
-
-**RETURN ONLY THIS JSON:**
-```json
-{
-  "findingIndex": {INDEX},
-  "verdict": "CONFIRMED|DISPUTED|REFUTED|UNSETTLED",
-  "sourceVerified": true,
-  "counterEvidence": [
-    { "claim": "what the counter-source says", "sourceUrl": "...", "tier": 1 }
-  ],
-  "searchesRun": 3,
-  "codexAvailable": true,
-  "note": "One sentence: the decisive observation."
-}
-```
-</challenger_instructions>
+<challenger>
+You receive findings that cite one source. Your only job is to try to break them; you have no stake in the answer.
+Findings: {findings with ids} · Source: {sourceUrl} (tier {tier}) · Questions: {questionTexts}
+1. Fetch the source. Does it say each claim, with the same numbers, scope, and date? A misquote, an over-generalization, or a figure the source has since updated is a refutation. If the source cites something else, find the primary.
+2. Search for the opposite: "{claim} debunked", "criticism", "retracted", "updated {year}", the competing figure. Favour Tier 1 and 2. Note newer data that supersedes the claim.
+3. Call the `codex` MCP tool (`model: gpt-6-astra`, `sandbox: read-only`) once: "Argue against these claims: {facts}. What is the strongest evidence each is wrong, outdated, or overstated? Return JSON objections keyed by finding id." Unavailable means skip it. An objection is a lead; confirm it on the web before it counts.
+Verdicts need evidence: REFUTED requires the source contradicting the finding or a Tier 1-2 counter-source you cite; DISPUTED requires a credible counter-source; CONFIRMED requires the source verified verbatim and a real search for the opposite that came up empty; otherwise UNSETTLED.
+Return: `{ "verdicts": [{ "id": "...", "verdict": "CONFIRMED|DISPUTED|REFUTED|UNSETTLED", "sourceVerified": true, "counterEvidence": [{ "claim": "...", "sourceUrl": "...", "tier": 1 }], "note": "the decisive observation" }] }`
+</challenger>
 </phase>
 
 <phase name="EVALUATE">
-Decide whether the research is **sufficient** — judged on whether the questions are actually answered by findings that survived CHALLENGE, not on a source count.
-
-**Sufficiency gate → SYNTHESIZE when both hold:**
-- Every question is answered at `medium` confidence or better (high=3, medium=2, low=1) by findings that are not `refuted`. A question whose answer was refuted is open again.
-- Significant gaps and contradictions — including DISPUTED findings — are resolved, or explicitly documented as limitations.
-
-`sourcesGathered` vs `targetSources` is a **sanity signal**, not a gate: if you'd synthesize with far fewer sources than expected, double-check you haven't stopped short; if you're well past target but still thin, keep going. Don't pad to hit a number.
-
-**Otherwise → RESEARCH** another round, unless the **iteration ceiling** (`maxIterations`, default 5) is reached — then SYNTHESIZE with the remaining gaps documented as limitations (futility exit; never loop forever).
-
-If continuing to RESEARCH:
-1. Generate follow-up questions from gaps, contradictions, refuted findings, and DISPUTED findings whose dispute a sharper question could settle (as many as the gaps warrant)
-2. Add to questions with `status="pending"`; increment `iteration`; set `phase="RESEARCH"` (the next round runs RESEARCH → CHALLENGE → EVALUATE again; only new findings are challenged)
-3. Update `task-loop.json`: set `statusMessage` and `continuationPrompt` to the specific open questions
-4. Log: `"Continuing research: {N} questions still below confidence / {M} open gaps"`
-
-Set `complete: true` in `task-loop.json` only when the sufficiency gate passes or the iteration ceiling is hit.
+Synthesize when every question is answered at medium or better by findings that are not refuted, and significant gaps, contradictions, and DISPUTED findings are resolved or explicitly documented as limitations. Otherwise generate sharper follow-up questions from the gaps, refuted findings, and disputes, add them as pending, increment `iteration`, update the task loop with the open questions, and return to RESEARCH, unless `maxIterations` is reached, in which case synthesize with the gaps documented. Don't pad sources to hit a number and don't quit while a question is still thin.
 </phase>
 
 <phase name="SYNTHESIZE">
-Write `report.md`:
-
-```markdown
-# {Topic}
-
-## Executive Summary
-[300-400 words. Most important finding first. State confidence. Note caveats.]
-
-## Background
-[200 words. Key terms. Context.]
-
-## Key Findings
-
-### [Theme 1]
-[Grouped findings. Inline citations. Note source strength.]
-
-### [Theme 2]
-[3-5 themes total]
-
-## Conflicting Information
-[Both sides. Which has better sourcing. Include every DISPUTED finding with its counter-evidence.]
-
-## Gaps & Limitations
-[What's unknown. What needs more research. List the claims REFUTED during CHALLENGE and why — the reader may have seen them elsewhere.]
-
-## Source Assessment
-- **High confidence:** [claims with 3+ quality sources that were challenged and CONFIRMED]
-- **Medium confidence:** [claims with 1-2 sources, or DISPUTED/UNSETTLED/unchallenged claims]
-- **Low confidence:** [single source or Tier 3 only]
-
-## Sources
-
-### Primary
-[Tier 1 sources with URLs]
-
-### Secondary
-[Tier 2-3 sources with URLs]
-
----
-*Sources: {sourcesGathered} | Searches: {totalSearches} | Teammates: {teammateCompletions} | Challenged: {challengeCompletions} ({refutedCount} refuted) | Iterations: {iteration} | Duration: {duration} | Date: {date}*
-```
-
-Set `phase="DONE"`.
-
-Update `task-loop.json`:
-```json
-{
-  "active": true,
-  "complete": true,
-  "completionMessage": "Research complete: \"{topic}\"\n\nResources used:\n  Searches: {totalSearches}\n  Sources: {sourcesGathered}/{targetSources}\n  Teammates: {teammateCompletions}\n  Challenged: {challengeCompletions} ({refutedCount} refuted)\n  Iterations: {iteration}\n\nReport: research/{slug}/report.md"
-}
-```
-
-The task loop hook will display this message when the session exits.
+Write `research/{slug}/report.md`: executive summary (most important finding first, with confidence and caveats); background; key findings grouped by theme with inline citations; conflicting information (both sides, which is better sourced, every DISPUTED finding with its counter-evidence); gaps and limitations (including what was REFUTED and why, since the reader may have seen it elsewhere); source assessment (high confidence: CONFIRMED with multiple quality sources; medium: one or two sources, or DISPUTED, UNSETTLED, or unchallenged; low: single Tier 3 source); and the source list by tier. Footer: iterations, questions, findings challenged and refuted, date. Set `phase: "DONE"` and complete the task loop with the report path.
 </phase>
 
 </steps>
 
 <error_handling>
-| Error | Action |
-|-------|--------|
-| Malformed JSON | Retry once, then mark low confidence |
-| Scrape fails | Continue with other URLs |
-| Rate limit | Wait 60s, reduce batch to 2 |
-| No results | Mark low confidence, rephrase as follow-up |
-| Preferred fetch tool unavailable | Fall back to built-in `WebFetch` |
-| `codex` MCP unavailable, empty, or error-text response | Teammate returns Claude-only findings, research continues |
-| Challenger fails, times out, or returns malformed JSON | Finding stays `UNSETTLED` (confidence capped at `medium`) — never silently CONFIRMED |
-| Claimed source unreachable for the challenger | `UNSETTLED`; the researcher's citation is not taken on faith |
+Malformed JSON from a researcher or challenger: retry once, then mark the question low confidence or the finding UNSETTLED. A fetch fails: continue with other sources. A challenger cannot reach the claimed source: UNSETTLED, never taken on faith. Codex unavailable: the challenger proceeds without it.
 </error_handling>
-
-<limits>
-| Resource | Guide | Notes |
-|----------|-------|-------|
-| Target sources | ~30 | Breadth signal, not a gate (set in INIT, ~20-40 by complexity) |
-| Max iterations | 5 | Hard backstop — forces a futility exit so the loop always terminates |
-| Teammates per batch | 8 | Parallelism cap — one teammate per pending question |
-| Challengers per round | 8 | One per load-bearing finding, ranked by how much the report would change if it's wrong |
-
-Searches per teammate, URLs scraped, and follow-ups per iteration are the agent's discretion. Completion is governed by the **sufficiency gate** (EVALUATE), bounded by `maxIterations`.
-</limits>
-
-<red_flags>
-Stop on **sufficiency, not a number**: synthesize once every question is answered at `medium`+ confidence with gaps documented — don't pad sources to hit a target, and don't quit while questions are still thin (unless `maxIterations` is reached). Weight Tier 1 sources higher. If stuck, narrow scope or generate sharper follow-ups. Never skip CHALLENGE to save time, and never report a finding as high confidence that no challenger tried to break — a confident report built on an unverified citation is worse than a hedged one.
-</red_flags>
