@@ -3,6 +3,8 @@
 #
 # Checks: JSON manifests parse and agree on version; CHANGELOG has the version;
 # hook scripts referenced by hooks.json exist, are executable, and pass bash -n;
+# plugin.json runs mcp/codex.py as the codex MCP server, the shim parses, and it
+# passes the protocol smoke test in scripts/test-codex-shim.py;
 # agent frontmatter names match filenames; every amux:<name> reference in skills,
 # commands, and README resolves to an agent or skill; command agent: fields resolve;
 # every agent's JSON "agent" identifier equals its filename and is unique;
@@ -45,6 +47,17 @@ done < <(jq -r '.. | .command? // empty' hooks/hooks.json)
 for script in hooks/*.sh; do
     grep -q "hooks/$(basename "$script")" hooks/hooks.json || err "$script exists but hooks.json never runs it"
 done
+
+# --- Codex MCP shim -------------------------------------------------------------
+shim=mcp/codex.py
+mcp_cmd=$(jq -r '.mcpServers.codex.command // empty' .claude-plugin/plugin.json)
+mcp_args=$(jq -r '.mcpServers.codex.args // [] | join(" ")' .claude-plugin/plugin.json)
+[[ "$mcp_cmd" == "python3" && "$mcp_args" == *"\${CLAUDE_PLUGIN_ROOT}/$shim"* ]] \
+    && ok "plugin.json runs $shim as the codex MCP server" \
+    || err "plugin.json mcpServers.codex must run python3 \${CLAUDE_PLUGIN_ROOT}/$shim (got: $mcp_cmd $mcp_args)"
+[[ -x "$shim" ]] || err "$shim is not executable"
+python3 -c 'import ast,sys; ast.parse(open(sys.argv[1]).read())' "$shim" 2>/dev/null && ok "$shim syntax" || err "$shim fails to parse"
+if python3 -I scripts/test-codex-shim.py "$shim" >/dev/null; then ok "$shim protocol smoke test"; else err "$shim protocol smoke test failed (run: python3 -I scripts/test-codex-shim.py)"; fi
 
 # --- Agents -------------------------------------------------------------------
 declare -A seen_ids

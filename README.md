@@ -51,7 +51,7 @@ Agents run on your session's default model. Six roles pin Claude Fable, where th
 
 Nothing runs automatically. The hooks announce and keep long-running skills alive; they don't enforce.
 
-- **session-start** — Announces the skills and reports whether Codex (dual-engine) and agent teams are available in this session (Codex CLI presence does not guarantee MCP usability)
+- **session-start** — Announces the skills and reports whether Codex (dual-engine) and agent teams are available in this session (checks for the Codex CLI and the `python3` the codex MCP shim runs on)
 - **task-loop-hook** — Generic task loop that blocks exit while any skill's `task-loop.json` has `complete: false`, so research and build runs aren't abandoned mid-flight. Opt out per session with `AMUX_SKIP_TASK_LOOP=1`.
 
 ### Artifacts written to your repo
@@ -64,18 +64,22 @@ Nothing runs automatically. The hooks announce and keep long-running skills aliv
 
 ### Validation
 
-`bash scripts/validate.sh` checks the manifests, hooks, agent names and references, the Codex model name against `docs/dual-engine.md`, and the counts in this README. CI runs it on every push and pull request.
+`bash scripts/validate.sh` checks the manifests, hooks, the codex MCP shim (manifest wiring, syntax, and a protocol smoke test that needs no real Codex), agent names and references, the Codex model name against `docs/dual-engine.md`, and the counts in this README. CI runs it on every push and pull request.
 
 ### Dual-Engine Architecture
 
 The canonical standard lives in [`docs/dual-engine.md`](docs/dual-engine.md); the code-review-pipeline and plan-review skills carry a copy that they inject into every reviewer's task context, so each agent definition stays thin, and validation checks that every copy names the same Codex model. Following that standard, each reviewer independently:
 1. Performs Claude-based domain review
-2. Calls the native `codex` MCP tool with `cwd` set to the repo root
+2. Calls the `codex` MCP tool (served by the plugin's `mcp/codex.py` shim over `codex exec`) with `cwd` set to the repo root
 3. Validates the Codex response — empty, non-JSON, or MCP error-text responses are treated as Codex-unavailable
 4. Merges findings with classification (AGREE/CHALLENGE/COMPLEMENT) only if Codex returned valid JSON
 5. Returns unified JSON with engine tags and cross-validation status
 
 Cross-validated findings (flagged by both engines) are surfaced as a display signal, not a score bump — two engines can share a blind spot. Reviewers gracefully degrade to Claude-only when Codex is unavailable or returns unusable output.
+
+#### The codex MCP shim
+
+Codex CLI deprecated `codex mcp-server` in 0.149.1 and removed it in 0.154.0; its replacement, `codex app-server`, speaks an experimental JSON-RPC protocol that is not MCP. Rather than depend on a third-party wrapper over that protocol, the plugin serves the `codex` tool itself: [`mcp/codex.py`](mcp/codex.py) is a standard-library Python stdio MCP server that runs one `codex exec` per call (read-only sandbox by default, `cwd` as the working root) and returns Codex's final message. The tool name and parameters match the removed server, so skills and agents are unchanged. It is one-shot (no `codex-reply`), runs parallel calls concurrently, and kills the whole Codex process tree on cancel or timeout. Environment knobs: `AMUX_CODEX_BIN` (binary not on `PATH`) and `AMUX_CODEX_TIMEOUT` (seconds, default 900). If you prefer a long-lived app-server session, community wrappers such as [codex-app-mcp](https://github.com/abetoots/codex-app-mcp) expose the same `codex` tool; register one under the server name `codex` in your own MCP config and it takes precedence over the plugin's.
 
 ### Adversarial Architecture
 
@@ -95,7 +99,7 @@ Verdicts require cited evidence in every case; "seems fine" is not a refutation 
 
 - **Claude Code** with plugin support
 - **Codex CLI** (optional, for dual-engine mode): `npm i -g @openai/codex`
-- **Codex MCP server** is declared as an MCP dependency (uses `codex mcp-server` — requires Codex CLI installed)
+- **Python 3** (optional, for dual-engine mode): the plugin's `codex` MCP server is `mcp/codex.py`, a standard-library stdio shim over `codex exec`. Codex CLI's own `codex mcp-server` no longer exists (removed in 0.154.0).
 - **Research MCPs** (optional) — the research, planning, and review skills don't prescribe any specific research tools; they use whatever is installed (built-in `WebSearch`/`WebFetch` always work). Install any docs/search/scrape/codebase MCPs you like and the skills will use them.
 
 ## Installation

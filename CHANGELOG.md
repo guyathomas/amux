@@ -2,6 +2,18 @@
 
 All notable changes to the amux plugin. Versions follow semver: breaking changes to commands, hooks, or artifact formats bump the major version.
 
+## [8.1.0] - 2026-10-09
+
+### Fixed
+- **Dual-engine mode was dead on current Codex CLI.** The plugin declared `codex mcp-server` as its `codex` MCP server; Codex deprecated that command in 0.149.1 and removed it in 0.154.0 (on current versions the old declaration launches the interactive TUI with `mcp-server` as the prompt, so the MCP connection hangs instead of failing). The plugin now ships its own server, `mcp/codex.py`: a standard-library Python stdio MCP shim that runs one `codex exec` per call and returns the final message. Tool name (`codex`) and parameters (`prompt`, `model`, `sandbox`, `cwd`, `profile`, `config`) are unchanged, so no skill or agent text changed. `codex app-server` was not adopted: it is an experimental non-MCP protocol, and wrapping it means a third-party dependency.
+
+### Added
+- `mcp/codex.py` accepts `output-schema` (Codex `--output-schema`) and `timeout-seconds`; honours `AMUX_CODEX_BIN` and `AMUX_CODEX_TIMEOUT` (default 900 s); runs parallel calls concurrently; kills the whole Codex process tree on client cancel or timeout (the npm wrapper spawns the native binary as a child, which a plain kill leaves holding the pipes).
+- `scripts/test-codex-shim.py`, a protocol smoke test with a fake `codex` (handshake, tool list, missing-CLI error, success and non-zero-exit paths); `scripts/validate.sh` runs it and checks the manifest wiring and shim syntax.
+
+### Changed
+- `python3` is now a prerequisite for dual-engine mode; the session-start banner reports when Codex is installed but `python3` is missing.
+
 ## [8.0.1] - 2026-09-09
 
 ### Changed

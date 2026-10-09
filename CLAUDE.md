@@ -8,6 +8,7 @@ A Claude Code plugin: skills, agents, commands, and hooks. There is no build ste
 - `agents/<name>.md` — one reviewer, verifier, or researcher role with a fixed JSON output. Frontmatter `name` must equal the filename; the output JSON's `"agent"` field must equal it too. Skills reference agents as `amux:<name>`.
 - `commands/<name>.md` — thin `/amux:<name>` entry points that invoke a skill.
 - `hooks/` — `hooks.json` plus the scripts it runs. Nothing here enforces automatically; the session-start banner announces, the task-loop hook keeps a long-running skill alive until it declares completion.
+- `mcp/codex.py` — the `codex` MCP server that `plugin.json` declares: a standard-library Python stdio shim over `codex exec` (Codex CLI no longer ships an MCP server). Every agent's `tools:` list names `mcp__plugin_amux_codex__codex`, so the server key, tool name, and parameter names stay fixed. `scripts/test-codex-shim.py` is its protocol smoke test; validation runs it.
 - `docs/dual-engine.md` — the canonical Codex standard and the one place the Codex model name is authoritative.
 - `scripts/validate.sh` — structural checks; CI runs it on every push.
 

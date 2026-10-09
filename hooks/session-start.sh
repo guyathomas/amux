@@ -4,12 +4,15 @@
 
 set -euo pipefail
 
-# Codex CLI presence is necessary but not sufficient for dual-engine mode —
-# the codex mcp-server declared in plugin.json must also be reachable.
-if command -v codex &>/dev/null; then
-    engine_status="**Engines:** Claude + Codex (dual-engine cross-validation available via the codex MCP server)"
-else
+# Dual-engine mode needs the Codex CLI and python3: the codex MCP server declared
+# in plugin.json is the plugin's own shim (mcp/codex.py) over `codex exec`, since
+# Codex CLI removed its native `codex mcp-server` in 0.154.0.
+if ! command -v codex &>/dev/null; then
     engine_status="**Engines:** Claude only (install Codex CLI for dual-engine cross-validation: npm i -g @openai/codex)"
+elif ! command -v python3 &>/dev/null; then
+    engine_status="**Engines:** Claude only (Codex CLI found, but the codex MCP shim needs python3 on PATH)"
+else
+    engine_status="**Engines:** Claude + Codex (dual-engine cross-validation via the codex MCP tool, served by the plugin's shim over codex exec)"
 fi
 
 # Agent teams power the parallel reviewer/researcher teammates. Without the
