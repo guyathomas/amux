@@ -3,10 +3,13 @@
 #
 # Checks: JSON manifests parse and agree on version; CHANGELOG has the version;
 # hook scripts referenced by hooks.json exist, are executable, and pass bash -n;
+# plugin.json runs mcp/codex.py as the codex MCP server, the shim parses, and it
+# passes the protocol smoke test in scripts/test-codex-shim.py;
 # agent frontmatter names match filenames; every amux:<name> reference in skills,
 # commands, and README resolves to an agent or skill; command agent: fields resolve;
 # every agent's JSON "agent" identifier equals its filename and is unique;
-# agents use model: inherit except the judge roles allowed to pin fable;
+# agents declare no tools: list; agents use model: inherit except the judge roles
+# allowed to pin fable;
 # the Codex model named anywhere matches docs/dual-engine.md; README agent/skill/
 # command counts match the files on disk.
 
@@ -36,6 +39,7 @@ grep -q "^## \[$plugin_version\]" CHANGELOG.md && ok "CHANGELOG has $plugin_vers
 
 # --- Hooks -------------------------------------------------------------------
 while IFS= read -r cmd; do
+    cmd=${cmd#\"}; cmd=${cmd%\"}   # commands quote the plugin root so paths with spaces survive
     script=${cmd#\$\{CLAUDE_PLUGIN_ROOT\}/}
     if [[ ! -f "$script" ]]; then err "hooks.json references missing script $script"; continue; fi
     [[ -x "$script" ]] || err "$script is not executable"
@@ -45,6 +49,17 @@ done < <(jq -r '.. | .command? // empty' hooks/hooks.json)
 for script in hooks/*.sh; do
     grep -q "hooks/$(basename "$script")" hooks/hooks.json || err "$script exists but hooks.json never runs it"
 done
+
+# --- Codex MCP shim -------------------------------------------------------------
+shim=mcp/codex.py
+mcp_cmd=$(jq -r '.mcpServers.codex.command // empty' .claude-plugin/plugin.json)
+mcp_args=$(jq -r '.mcpServers.codex.args // [] | join(" ")' .claude-plugin/plugin.json)
+[[ "$mcp_cmd" == "python3" && "$mcp_args" == *"\${CLAUDE_PLUGIN_ROOT}/$shim"* ]] \
+    && ok "plugin.json runs $shim as the codex MCP server" \
+    || err "plugin.json mcpServers.codex must run python3 \${CLAUDE_PLUGIN_ROOT}/$shim (got: $mcp_cmd $mcp_args)"
+[[ -x "$shim" ]] || err "$shim is not executable"
+python3 -c 'import ast,sys; ast.parse(open(sys.argv[1]).read())' "$shim" 2>/dev/null && ok "$shim syntax" || err "$shim fails to parse"
+if python3 -I scripts/test-codex-shim.py "$shim" >/dev/null; then ok "$shim protocol smoke test"; else err "$shim protocol smoke test failed (run: python3 -I scripts/test-codex-shim.py)"; fi
 
 # --- Agents -------------------------------------------------------------------
 declare -A seen_ids
@@ -61,10 +76,21 @@ for a in agents/*.md; do
     seen_ids[$id]=$a
 done
 
+# --- Tool policy ----------------------------------------------------------------
+# Agents declare no tools: list, so they inherit the environment's research MCPs.
+# A whitelist silently hides every installed docs/search/codebase tool from them.
+for a in agents/*.md; do
+    if awk 'NR>1 && /^---/{exit} /^tools:/{found=1} END{exit !found}' "$a"; then
+        err "$a: declares a tools: list; agents inherit all tools (see CLAUDE.md)"
+    else
+        ok "agent $(basename "$a" .md) inherits tools"
+    fi
+done
+
 # --- Model policy ---------------------------------------------------------------
 # Agents inherit the user's default model. Only judge roles whose wrong verdict
-# would silently drop a finding may pin fable; everything else must be inherit.
-FABLE_ROLES="review-design verify-finding verify-design-finding verify-plan-finding premortem build-plan"
+# would silently drop a finding or misdirect the build may pin fable.
+FABLE_ROLES="verify premortem build-plan"
 for a in agents/*.md; do
     base=$(basename "$a" .md)
     model=$(awk 'NR>1 && /^---/{exit} /^model:/{sub(/^model:[ ]*/,""); print; exit}' "$a")

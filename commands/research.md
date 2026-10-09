@@ -1,5 +1,5 @@
 ---
-description: "Deep research using agent teams, web search, and scraping. Decomposes the topic into the questions that matter, researches in parallel via teammates, evaluates confidence, iterates until sufficient, and synthesizes with source attribution."
+description: "Deep research: decomposes the topic into the questions that matter, researches them in parallel, has independent challengers try to break the load-bearing findings, iterates until the questions are answered, and writes a report with source attribution."
 argument-hint: "[topic to research]"
 ---
 

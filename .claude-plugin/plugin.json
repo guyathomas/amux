@@ -1,7 +1,7 @@
 {
   "name": "amux",
   "description": "Research, planning, and code review skills for Claude Code",
-  "version": "8.0.1",
+  "version": "9.0.0",
   "author": {
     "name": "Guy Thomas",
     "email": "guythomas721@gmail.com"
@@ -12,8 +12,8 @@
   "keywords": ["skills", "research", "planning", "code-review", "agent-teams", "codex", "dual-engine"],
   "mcpServers": {
     "codex": {
-      "command": "codex",
-      "args": ["mcp-server"]
+      "command": "python3",
+      "args": ["-I", "${CLAUDE_PLUGIN_ROOT}/mcp/codex.py"]
     }
   }
 }
