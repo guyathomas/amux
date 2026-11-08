@@ -6,7 +6,8 @@
 # filenames; every amux:<name> reference resolves to an agent or skill; every
 # agent's JSON "agent" identifier equals its filename and is unique; agents declare
 # no tools: list; agents use model: inherit except the judge roles allowed to pin
-# fable; no stale references to removed components; README counts match disk.
+# fable; every agent and researching skill carries the identical Tools section;
+# no stale references to removed components; README counts match disk.
 
 set -uo pipefail
 cd "$(dirname "$0")/.."
@@ -95,6 +96,16 @@ if grep -rnE "$stale" skills agents README.md CLAUDE.md >/dev/null 2>&1; then
 else
     ok "no stale references to removed components"
 fi
+
+# --- Shared Tools section ---------------------------------------------------------
+# Every agent, plus the skills that research, carries the same Tools section.
+tools_block() { awk '/<!-- tools -->/{on=1} on{print} /<!-- \/tools -->/{exit}' "$1"; }
+ref_block=$(tools_block agents/review.md)
+[[ -n "$ref_block" ]] || err "agents/review.md has no <!-- tools --> section"
+for f in agents/*.md skills/planning/SKILL.md skills/research/SKILL.md; do
+    [[ "$(tools_block "$f")" == "$ref_block" ]] && ok "$f Tools section matches" \
+        || err "$f: Tools section missing or differs from agents/review.md"
+done
 
 # --- README counts -------------------------------------------------------------
 count_files() { find "$1" -maxdepth "${3:-1}" -name "$2" | wc -l | tr -d ' '; }

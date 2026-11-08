@@ -4,14 +4,22 @@ All notable changes to the amux plugin. Versions follow semver: breaking changes
 
 ## [10.0.0] - 2026-11-08
 
-A second simplification release: four skills and four agents, no commands, hooks, or MCP server. Skills, agents, and the plugin manifest changed shape, hence the major bump.
+A simplification release with a few additions: five skills and four agents, no commands, hooks, or MCP server. Skills, agents, the plugin manifest, and the `prd.md` format changed shape, hence the major bump.
 
 ### Changed
 - **planning absorbs spike and plan-review.** Feasibility spikes (pre-stated falsifier, optional independent Codex run, disagreement is inconclusive) are its SPIKE phase; the plan review (reviewer, verifier on critical and high findings, only CONFIRMED mechanical fixes applied) is its REVIEW-PLAN phase. `/amux:planning review {slug}` re-reviews an existing plan.
-- **One reviewer agent.** `review` replaces `review-change` and `review-plan`, with a `change` or `plan` mode and the same sections and output shapes as before.
+- **One reviewer agent.** `review` replaces `review-change` and `review-plan`, with a `change` or `plan` mode; same sections and outputs as before, plus acceptance-criteria, click-test, and `toolsDegraded` checks.
 - **Codex is called directly.** `verify`, `premortem`, research challengers, and the planning spike run `codex exec` through Bash with the Codex CLI's default model. The model is no longer pinned in the plugin.
 - Skill prose trimmed by roughly a third; the `code-review-pipeline` skill's frontmatter name now matches its directory.
 - `scripts/validate.sh` checks skill names against directories and flags stale references to removed components; the hook, shim, command, and Codex-model checks are gone.
+
+### Added
+- **`retro` skill**: an end-of-session retrospective. It proposes CLAUDE.md, project-skill, or amux changes, each backed by a quoted session moment, and applies only the ones the user approves. Writes `retros/{date}-{slug}.md`.
+- **Shared Tools section** in every agent and in the planning and research skills, so the plugin no longer depends on the user's CLAUDE.md. It picks tools by job: version-exact docs, library source via shallow clone, GitHub prior art, a search tool, and a JS-rendering scraper, each with a built-in fallback.
+- **Tool check and `toolsDegraded`**: planning and research state up front which tool will serve each job and which are missing or not running; every skill says whether Codex is available, and build checks its test runners. Every gap (not installed, not running, quota exhausted, error, timeout) appears in the report under **Tools degraded**.
+- **Combined product and tech spec**: planning captures acceptance criteria and non-goals. `prd.md`'s Goal and Selected approach sections become Product and Design, with a Mermaid diagram when the change crosses components. Every acceptance criterion maps to a gate's test.
+- **Click tests and axe-core**: UI gates include a browser click test that runs an axe-core scan; serious or critical violations fail it. The plan reviewer and the code reviewer flag UI work that has neither.
+- Planning research covers library source, analogous open-source code, and comparable products' public docs.
 
 ### Removed
 - `commands/` (all six): skills are already invocable as `/amux:<name>`.

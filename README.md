@@ -4,13 +4,14 @@ Research, planning, build, and review skills for Claude Code. One agent finds, a
 
 ## What's Included
 
-### Skills (4)
+### Skills (5)
 
 Invoke as `/amux:<name>` or let Claude pick one when the request matches.
 
-- **planning** — Researches approaches against real sources, states what would rule each one out, attacks the recommendation with a fresh-context pre-mortem, spikes any feasibility question still open (optionally on Codex and Claude independently; disagreement means inconclusive), writes a TDD-gated plan once you choose, then reviews it with an independent verifier and applies only confirmed mechanical fixes. `/amux:planning review {slug}` re-reviews an existing plan.
+- **planning** — Researches approaches against real sources, states what would rule each one out, attacks the recommendation with a fresh-context pre-mortem, spikes any feasibility question still open (optionally on Codex and Claude independently; disagreement means inconclusive), writes a combined product and tech spec with TDD gates once you choose (acceptance criteria mapped to tests, a Mermaid diagram for cross-component designs, click tests with an axe-core accessibility scan for UI), then reviews it with an independent verifier and applies only confirmed mechanical fixes. `/amux:planning review {slug}` re-reviews an existing plan.
 - **build** — Executes a plan gate by gate under TDD: verifies guessed assumptions first, opens each gate with failing tests, closes it only when lint, format, test, and build pass, records deviations, replans when the code refutes the plan, and ends with the review pipeline. Progress lives in `plan.json`, so it survives context resets.
 - **code-review-pipeline** — One reviewer covers correctness, security, structure, tests, docs, and (for structural changes) design; a verifier batched per file tries to refute the critical and high findings. Confirmed implementation issues are fixed; design findings are always your decision. Add `thorough` to verify medium findings too.
+- **retro** — End-of-session retrospective: finds where the session lost time or quality (corrections, failed tools, refuted findings, replans) and proposes exact changes to your CLAUDE.md files, project skills, or amux, each backed by a quoted moment. Nothing is applied without your approval.
 - **research** — Decomposes a topic into the questions that matter, researches them in parallel, has independent challengers verify each load-bearing citation and search for counter-evidence, iterates until the questions are answered, and writes a report with source attribution and confidence.
 
 ### Agents (4)
@@ -30,6 +31,7 @@ Registered as `amux:<name>`; skills dispatch them. Agents declare no tool list, 
 | `plans/{slug}/spikes/` | planning | Throwaway; delete once recorded |
 | `research/{slug}/report.md` | research | Commit the report; `state.json` and `findings.json` are working files |
 | `reviews/{branch}.md` | code-review-pipeline | Commit or ignore; regenerated on every review |
+| `retros/{date}-{slug}.md` | retro | Commit or ignore; the record of workflow changes and why |
 
 ## How it stays honest
 
@@ -42,13 +44,17 @@ Registered as `amux:<name>`; skills dispatch them. Agents declare no tool list, 
 
 Verdicts require cited evidence everywhere. "Seems fine" is not a refutation; "probably" is not a confirmation; PLAUSIBLE is always legitimate.
 
+### Tools
+
+Every agent carries the same Tools section, so the plugin does not depend on your CLAUDE.md. It picks a tool by job (version-exact docs such as Context7, the library's own source via a shallow clone, a GitHub tool for prior art, a search tool such as Serper, a scraper such as Firecrawl) and always falls back to the built-ins. Your own instructions override its order. Each run starts with a tool check, and every gap ends up in the report under **Tools degraded**, with a status: not installed, not running, quota exhausted, error, or timeout.
+
 ### Codex
 
 Codex argues against things; it never co-authors a finding. `verify`, `premortem`, research challengers, and planning's optional dual-engine spike run `codex exec` directly through Bash (read-only sandbox, except the spike's `workspace-write` run confined to its directory) using your Codex CLI's default model. Without Codex every path runs Claude-only and says so.
 
 ### Validation
 
-`bash scripts/validate.sh` checks the manifests, skill and agent names, model and tool-list policy, references, stale references to removed components, and the counts in this README. CI runs it on every push and pull request.
+`bash scripts/validate.sh` checks the manifests, skill and agent names, model and tool-list policy, the shared Tools section, references, stale references to removed components, and the counts in this README. CI runs it on every push and pull request.
 
 ## Prerequisites
 

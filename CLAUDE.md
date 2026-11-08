@@ -1,6 +1,6 @@
 # amux — contributor notes
 
-A Claude Code plugin: four skills and four agents. There is no build step; the files are the product.
+A Claude Code plugin: five skills and four agents. There is no build step; the files are the product.
 
 ## Layout
 
@@ -14,7 +14,7 @@ A Claude Code plugin: four skills and four agents. There is no build step; the f
 - Judgment findings (design, scope) are the user's decision at any verdict; only implementation findings are ever auto-fixed.
 - Pre-stated failure conditions everywhere they apply: kill criteria on approaches, falsified-if on spikes, RED tests before a gate opens.
 - Codex is used only where it argues against something (verify, pre-mortem, research challengers, planning's optional dual-engine spike), called as `codex exec` through Bash with the CLI's default model, and every path has a Claude-only fallback that says so.
-- Skills prescribe evidence standards, not tools. Don't hard-code tool names beyond `codex exec` and the built-ins; agents check their tool list and honor any preferences in the user's own instructions.
+- The plugin must work without the user's CLAUDE.md. Tool choice lives in one `<!-- tools -->` section, copied verbatim into every agent and into the planning and research skills (`scripts/validate.sh` enforces identity; edit all copies together). It names tools by job, gives third-party names only as examples, ends every line with a built-in fallback, and requires every gap to be reported in `toolsDegraded`. The user's own instructions override its order.
 - One state file per run (`plans/{slug}/plan.json`, `research/{slug}/state.json`) with the phase and what is done, so a context reset can resume. No counters, no per-phase files.
 - Agents use `model: inherit`. Pin `fable` only where a wrong judgment silently drops a finding or misdirects the build: `verify`, `premortem`, `build-plan`. `scripts/validate.sh` enforces that list. Fable is optional: switch those files to `inherit` and everything still works.
 
