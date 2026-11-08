@@ -2,16 +2,12 @@
 # Structural validation for the amux plugin. Run before committing; CI runs it on every push.
 #
 # Checks: JSON manifests parse and agree on version; CHANGELOG has the version;
-# hook scripts referenced by hooks.json exist, are executable, and pass bash -n;
-# plugin.json runs mcp/codex.py as the codex MCP server, the shim parses, and it
-# passes the protocol smoke test in scripts/test-codex-shim.py;
-# agent frontmatter names match filenames; every amux:<name> reference in skills,
-# commands, and README resolves to an agent or skill; command agent: fields resolve;
-# every agent's JSON "agent" identifier equals its filename and is unique;
-# agents declare no tools: list; agents use model: inherit except the judge roles
-# allowed to pin fable;
-# the Codex model named anywhere matches docs/dual-engine.md; README agent/skill/
-# command counts match the files on disk.
+# skill frontmatter names match their directories; agent frontmatter names match
+# filenames; every amux:<name> reference resolves to an agent or skill; every
+# agent's JSON "agent" identifier equals its filename and is unique; agents declare
+# no tools: list; agents use model: inherit except the judge roles, which pin
+# claude-opus-5-5; every agent and researching skill carries the identical Tools section;
+# no stale references to removed components; README counts match disk.
 
 set -uo pipefail
 cd "$(dirname "$0")/.."
@@ -25,7 +21,7 @@ for tool in jq python3; do
 done
 
 # --- JSON manifests --------------------------------------------------------
-for f in .claude-plugin/plugin.json .claude-plugin/marketplace.json hooks/hooks.json; do
+for f in .claude-plugin/plugin.json .claude-plugin/marketplace.json; do
     python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$f" 2>/dev/null && ok "$f parses" || err "$f is not valid JSON"
 done
 
@@ -37,32 +33,16 @@ market_version=$(jq -r '.plugins[0].version' .claude-plugin/marketplace.json)
 grep -q "^## \[$plugin_version\]" CHANGELOG.md && ok "CHANGELOG has $plugin_version" \
     || err "CHANGELOG.md has no entry for $plugin_version"
 
-# --- Hooks -------------------------------------------------------------------
-while IFS= read -r cmd; do
-    cmd=${cmd#\"}; cmd=${cmd%\"}   # commands quote the plugin root so paths with spaces survive
-    script=${cmd#\$\{CLAUDE_PLUGIN_ROOT\}/}
-    if [[ ! -f "$script" ]]; then err "hooks.json references missing script $script"; continue; fi
-    [[ -x "$script" ]] || err "$script is not executable"
-    bash -n "$script" 2>/dev/null && ok "$script syntax" || err "$script fails bash -n"
-done < <(jq -r '.. | .command? // empty' hooks/hooks.json)
-
-for script in hooks/*.sh; do
-    grep -q "hooks/$(basename "$script")" hooks/hooks.json || err "$script exists but hooks.json never runs it"
+# --- Skills -------------------------------------------------------------------
+for d in skills/*/; do
+    base=$(basename "$d")
+    name=$(awk 'NR>1 && /^---/{exit} /^name:/{sub(/^name:[ ]*/,""); print; exit}' "$d/SKILL.md")
+    [[ "$name" == "$base" ]] && ok "skill $base name matches directory" \
+        || err "skills/$base/SKILL.md: frontmatter name '$name' != directory '$base'"
 done
 
-# --- Codex MCP shim -------------------------------------------------------------
-shim=mcp/codex.py
-mcp_cmd=$(jq -r '.mcpServers.codex.command // empty' .claude-plugin/plugin.json)
-mcp_args=$(jq -r '.mcpServers.codex.args // [] | join(" ")' .claude-plugin/plugin.json)
-[[ "$mcp_cmd" == "python3" && "$mcp_args" == *"\${CLAUDE_PLUGIN_ROOT}/$shim"* ]] \
-    && ok "plugin.json runs $shim as the codex MCP server" \
-    || err "plugin.json mcpServers.codex must run python3 \${CLAUDE_PLUGIN_ROOT}/$shim (got: $mcp_cmd $mcp_args)"
-[[ -x "$shim" ]] || err "$shim is not executable"
-python3 -c 'import ast,sys; ast.parse(open(sys.argv[1]).read())' "$shim" 2>/dev/null && ok "$shim syntax" || err "$shim fails to parse"
-if python3 -I scripts/test-codex-shim.py "$shim" >/dev/null; then ok "$shim protocol smoke test"; else err "$shim protocol smoke test failed (run: python3 -I scripts/test-codex-shim.py)"; fi
-
 # --- Agents -------------------------------------------------------------------
-declare -A seen_ids
+seen_ids=" "
 for a in agents/*.md; do
     base=$(basename "$a" .md)
     name=$(awk 'NR>1 && /^---/{exit} /^name:/{sub(/^name:[ ]*/,""); print; exit}' "$a")
@@ -72,8 +52,8 @@ for a in agents/*.md; do
     id=$(grep -oE '"agent": *"[^"]+"' "$a" | head -1 | sed -E 's/.*"agent": *"([^"]+)"/\1/')
     [[ -n "$id" ]] || { err "$a: no \"agent\" identifier in its output JSON"; continue; }
     [[ "$id" == "$base" ]] || err "$a: output identifier '$id' != filename '$base'"
-    [[ -n "${seen_ids[$id]:-}" ]] && err "duplicate agent identifier '$id' in $a and ${seen_ids[$id]}"
-    seen_ids[$id]=$a
+    [[ "$seen_ids" == *" $id "* ]] && err "duplicate agent identifier '$id' in $a"
+    seen_ids+="$id "
 done
 
 # --- Tool policy ----------------------------------------------------------------
@@ -89,17 +69,18 @@ done
 
 # --- Model policy ---------------------------------------------------------------
 # Agents inherit the user's default model. Only judge roles whose wrong verdict
-# would silently drop a finding or misdirect the build may pin fable.
-FABLE_ROLES="verify premortem build-plan"
+# would silently drop a finding or misdirect the build pin claude-opus-5-5.
+PINNED_MODEL="claude-opus-5-5"
+PINNED_ROLES="verify premortem build-plan"
 for a in agents/*.md; do
     base=$(basename "$a" .md)
     model=$(awk 'NR>1 && /^---/{exit} /^model:/{sub(/^model:[ ]*/,""); print; exit}' "$a")
-    if [[ " $FABLE_ROLES " == *" $base "* ]]; then
-        [[ "$model" == "fable" || "$model" == "inherit" ]] && ok "agent $base model '$model' (fable allowed)" \
-            || err "$a: model '$model' — judge roles pin fable or inherit"
+    if [[ " $PINNED_ROLES " == *" $base "* ]]; then
+        [[ "$model" == "$PINNED_MODEL" ]] && ok "agent $base model $PINNED_MODEL" \
+            || err "$a: model '$model' — judge roles pin $PINNED_MODEL"
     else
         [[ "$model" == "inherit" ]] && ok "agent $base model inherit" \
-            || err "$a: model '$model' — only judge roles ($FABLE_ROLES) may pin a model; use inherit"
+            || err "$a: model '$model' — only judge roles ($PINNED_ROLES) may pin a model; use inherit"
     fi
 done
 
@@ -108,31 +89,29 @@ while IFS= read -r ref; do
     name=${ref#amux:}
     [[ -f "agents/$name.md" || -d "skills/$name" ]] && ok "reference $ref resolves" \
         || err "reference '$ref' matches no agent or skill"
-done < <(grep -rhoE 'amux:[a-z0-9-]+' skills commands README.md docs 2>/dev/null | sort -u)
+done < <(grep -rhoE 'amux:[a-z0-9-]+' skills agents README.md 2>/dev/null | sort -u)
 
-if grep -rnE '\bcore:[a-z-]+' skills commands agents README.md >/dev/null 2>&1; then
-    err "stale 'core:' agent references remain:"; grep -rnE '\bcore:[a-z-]+' skills commands agents README.md >&2
+stale='mcp__plugin_amux_codex|codex MCP|task-loop|amux:(spike|plan-review|review-plan|review-change)|/amux:(spike|plan-review)|(spike|plan-review)\` skill|(spike|plan-review) skill|dual-engine\.md'
+if grep -rnE "$stale" skills agents README.md CLAUDE.md >/dev/null 2>&1; then
+    err "stale references to removed components:"; grep -rnE "$stale" skills agents README.md CLAUDE.md >&2
+else
+    ok "no stale references to removed components"
 fi
 
-for c in commands/*.md; do
-    ag=$(awk 'NR>1 && /^---/{exit} /^agent:/{sub(/^agent:[ ]*/,""); print; exit}' "$c")
-    [[ -z "$ag" ]] && continue
-    [[ -f "agents/${ag#amux:}.md" ]] && ok "$c agent '$ag' resolves" || err "$c: agent '$ag' does not exist"
+# --- Shared Tools section ---------------------------------------------------------
+# Every agent, plus the skills that research, carries the same Tools section.
+tools_block() { awk '/<!-- tools -->/{on=1} on{print} /<!-- \/tools -->/{exit}' "$1"; }
+ref_block=$(tools_block agents/review.md)
+[[ -n "$ref_block" ]] || err "agents/review.md has no <!-- tools --> section"
+for f in agents/*.md skills/planning/SKILL.md skills/research/SKILL.md; do
+    [[ "$(tools_block "$f")" == "$ref_block" ]] && ok "$f Tools section matches" \
+        || err "$f: Tools section missing or differs from agents/review.md"
 done
-
-# --- Codex model single source -------------------------------------------------
-canon=$(grep -oE 'gpt-[a-z0-9.-]+' docs/dual-engine.md | head -1)
-[[ -n "$canon" ]] || err "docs/dual-engine.md names no Codex model"
-while IFS= read -r line; do
-    model=$(grep -oE 'gpt-[a-z0-9.-]+' <<<"$line" | head -1)
-    [[ "$model" == "$canon" ]] || err "Codex model '$model' != canonical '$canon' at $line"
-done < <(grep -rnoE 'gpt-[a-z0-9.-]+' skills agents | grep -v "$canon" || true)
-ok "Codex model '$canon' consistent"
 
 # --- README counts -------------------------------------------------------------
 count_files() { find "$1" -maxdepth "${3:-1}" -name "$2" | wc -l | tr -d ' '; }
-agents_n=$(count_files agents '*.md'); skills_n=$(count_files skills SKILL.md 2); commands_n=$(count_files commands '*.md')
-for pair in "Agents:$agents_n" "Skills:$skills_n" "Commands:$commands_n"; do
+agents_n=$(count_files agents '*.md'); skills_n=$(count_files skills SKILL.md 2)
+for pair in "Agents:$agents_n" "Skills:$skills_n"; do
     label=${pair%%:*}; n=${pair##*:}
     grep -q "### $label ($n)" README.md && ok "README says $label ($n)" \
         || err "README heading '### $label (N)' does not say $n"

@@ -1,7 +1,7 @@
 {
   "name": "amux",
   "description": "Research, planning, and code review skills for Claude Code",
-  "version": "9.0.0",
+  "version": "10.0.0",
   "author": {
     "name": "Guy Thomas",
     "email": "guythomas721@gmail.com"
@@ -9,11 +9,12 @@
   "homepage": "https://github.com/guyathomas/amux",
   "repository": "https://github.com/guyathomas/amux",
   "license": "MIT",
-  "keywords": ["skills", "research", "planning", "code-review", "agent-teams", "codex", "dual-engine"],
-  "mcpServers": {
-    "codex": {
-      "command": "python3",
-      "args": ["-I", "${CLAUDE_PLUGIN_ROOT}/mcp/codex.py"]
-    }
-  }
+  "keywords": [
+    "skills",
+    "research",
+    "planning",
+    "code-review",
+    "tdd",
+    "codex"
+  ]
 }

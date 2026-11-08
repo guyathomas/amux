@@ -1,91 +1,93 @@
 ---
 name: planning
-description: Use before implementing any non-trivial feature. Researches approaches against real sources, states what would rule each one out, evaluates them and attacks the recommendation with a pre-mortem, runs a spike when a feasibility question is still open, writes a TDD-gated plan once the user chooses, and stress-tests it before any code is written.
+description: Use before implementing any non-trivial feature. Researches approaches against real sources, states what would rule each one out, attacks the recommendation with a pre-mortem, spikes open feasibility questions, writes a TDD-gated plan once the user chooses, and reviews it with an independent verifier before any code is written. Pass `review {slug}` to re-review an existing plan.
+argument-hint: "[feature | review {slug}]"
 ---
 
 # Planning
 
-No implementation without an evidence-backed approach that the user chose with the case against it in view. Announce at start: "I'm using the planning skill to research approaches before implementation."
+No implementation without an evidence-backed approach the user chose with the case against it in view. Announce: "I'm using the planning skill to research approaches before implementation."
 
-**Use for:** features with architectural decisions, unfamiliar libraries or patterns, anything with more than one valid approach, "how should we build X?". **Not for:** one-line fixes, obvious bugs, tasks with explicit instructions.
+**Use for:** architectural decisions, unfamiliar libraries, more than one valid approach. **Not for:** one-line fixes, obvious bugs, explicit instructions.
 
-## Artifacts
+## State
 
-```
-plans/{slug}/
-  prd.md          # the plan: goal, approach, quality commands, TDD gates
-  plan.json       # state: scope, approaches, evaluation, spikes, review, build
-  notes/          # free-form working notes, organized however you like
-  spikes/{name}/  # throwaway spike code, never merged
-  task-loop.json  # written by the build skill
-```
-
-Slug: lowercase, hyphens, `a-z0-9-` only, at most 50 characters. `plan.json`:
+`plans/{slug}/` holds `prd.md` (the plan), `plan.json` (state), `notes/` (free-form), and `spikes/{name}/` (throwaway code, never merged). Slug: `a-z0-9-`, at most 50 characters.
 
 ```json
-{
-  "feature": "...",
-  "phase": "UNDERSTAND|RESEARCH|FORMULATE|EVALUATE|SPIKE|PRESENT|SELECTED|BUILD-PLAN|REVIEW-PLAN",
-  "scope": "the ask as understood: what it must do, constraints, technologies in play",
-  "approaches": [],
-  "evaluation": null,
-  "spikes": [],
-  "selectedApproach": null,
-  "review": null,
-  "build": null,
-  "updatedAt": "ISO-8601"
-}
+{ "feature": "...", "phase": "UNDERSTAND|RESEARCH|FORMULATE|EVALUATE|SPIKE|PRESENT|SELECTED|BUILD-PLAN|REVIEW-PLAN",
+  "scope": "...", "acceptanceCriteria": [{ "id": "AC1", "text": "..." }], "nonGoals": [], "approaches": [], "evaluation": null, "spikes": [], "selectedApproach": null, "review": null, "build": null, "toolsDegraded": [], "updatedAt": "ISO-8601" }
 ```
 
-Update `phase` and `updatedAt` as you go, so a context reset can resume. On invocation, if `plans/{slug}/plan.json` exists, offer to resume from its phase (or reuse, extend, or restart a plan past SELECTED).
+Write `phase` after every phase. If `plan.json` exists, offer to resume from its phase. `review {slug}` jumps straight to REVIEW-PLAN.
 
-## Research
+Evidence standards: current docs beat training data for version-specific claims, primary sources beat articles, cite a URL for library claims and `file:line` for repo claims.
 
-Reach for whatever tools your environment provides; the skill prescribes none. Check your tool list for docs, search, and codebase tools before falling back to the built-ins, and use any tools the user's own instructions prefer. Evidence standards: current docs beat training data for version-specific claims; primary sources beat articles about them; cite a URL or doc section for library claims and `file:line` for repo claims.
+**Tool check.** Before starting, tell the user in one short block which tool will serve each capability in the Tools section, which are not installed or not running, and whether Codex is available (`command -v codex`). Pass the Tools section into every subagent prompt you write yourself. The final output lists every `toolsDegraded` entry from you and your agents under **Tools degraded**, or says none were; append them to `toolsDegraded` in the state file as they arrive.
 
-Codex is used only where it argues against something: the pre-mortem, the verifier, and the optional dual-engine spike. See `docs/dual-engine.md`.
+<!-- tools -->
+## Tools
+
+Pick by job and use the first option your tool list has. Tool preferences in the user's own instructions override this order. The built-ins at the end of each line always work.
+
+- **Library or framework behaviour:** a docs tool that serves the exact version (e.g. Context7). When the docs are vague, silent, or disagree with what you observe, read the library's source: `git clone --depth 1` into a scratch directory outside the repo, or a source-indexing tool, and cite upstream `file:line`. Built-in: WebFetch on the official docs.
+- **Prior art:** analogous open-source implementations, found with a GitHub tool or `gh search repos` / `gh search code`. Clone the promising ones and read the code, not the README.
+- **Web search:** a search tool (e.g. Serper, Firecrawl search). Built-in: WebSearch.
+- **Reading a page:** a scraping tool that renders JavaScript (e.g. Firecrawl). Built-in: WebFetch.
+- **This repo:** Grep, Glob, Read; an LSP or code-intelligence tool when present.
+
+Call out every gap; never degrade silently. Record each in `toolsDegraded` in your output, `[{ "capability": "web search", "tool": "Firecrawl", "status": "not-installed|not-running|needs-auth|denied|quota-exhausted|error|timeout", "detail": "...", "fellBackTo": "WebSearch" }]`:
+- **not-installed:** no non-built-in option for a capability you needed is in your tool list.
+- **not-running:** your context says the server failed to connect, or every call fails to reach it.
+- **needs-auth:** the tool asks for a login or API key you cannot provide.
+- **denied:** the session's permissions blocked the call.
+- **quota-exhausted:** the tool reports exhausted credits, quota, or a rate limit. Do not retry it this run.
+- **error / timeout:** after one retry.
+Then move to the next option. Omit the field when nothing degraded.
+<!-- /tools -->
+
 
 ## Process
 
-`UNDERSTAND → RESEARCH → FORMULATE → EVALUATE → [SPIKE] → PRESENT → SELECTED → BUILD-PLAN → REVIEW-PLAN`
-
 ### UNDERSTAND
-Clarify with the user what the feature must do, its constraints, and the technologies already in use. Write it as `scope` in `plan.json`; the scope reviewer later measures drift against this text, so make it the ask, not a plan.
+Clarify the problem, who it is for, numbered acceptance criteria (AC1, AC2, … — observable behaviour a test can check), non-goals, constraints, and the technologies in play. Write the ask as `scope` (not a plan; the reviewer measures drift against it), and the criteria and non-goals as `acceptanceCriteria` and `nonGoals`. A non-goal or constraint you inferred (from repo conventions, not from the user) is marked `inferred: true` and shown at PRESENT for the user to confirm; never treat it as stated.
 
 ### RESEARCH
-Gather evidence in parallel (subagents where it helps) on: current library and API docs for the pieces involved (signatures, version gotchas, deprecations); real-world implementations and comparisons; how production codebases structure this and the pitfalls they hit; and the conventions of the code you will integrate with. Keep notes under `notes/`.
+In parallel: current docs for the libraries in play or under consideration, read in source where the docs fall short; analogous open-source implementations, read in code; how comparable products expose this feature (their public docs and changelogs); and the conventions of the code you will touch. Notes go in `notes/`.
 
 ### FORMULATE
-Write genuinely distinct approaches, as many as the problem warrants, never a false simple-versus-complex binary. For each: how it works, evidence by kind (docs, prior art, production code, source), concrete pros and cons with sources, why it fits this codebase, and **kill criteria**: the evidence that would rule it out. State kill criteria now, while you have no favorite. Store them under `approaches` in `plan.json`:
-
-```json
-{ "index": 1, "name": "...", "howItWorks": "...", "evidence": { "docs": "...", "priorArt": "...", "productionCode": "...", "source": "..." }, "tradeoffs": { "pros": [], "cons": [] }, "fitReason": "...", "killCriteria": [] }
-```
+Genuinely distinct approaches, never a false simple-versus-complex binary. Each in `approaches`: `index`, `name`, `howItWorks`, `evidence`, `tradeoffs` (pros and cons with sources), `fitReason`, and **`killCriteria`**: the evidence that would rule it out, stated now while you have no favorite.
 
 ### EVALUATE
-1. Evaluate each approach against the project (read `package.json`, the existing architecture, the relevant modules): feasibility, risks, strengths, implementation notes, and a preferred approach with the reason. Write it under `evaluation` in `plan.json`.
-2. Dispatch one `amux:premortem` with `plan.json` and the repository root. It assumes the recommendation was built and failed, tests each failure mode against the evidence and the repo, checks the kill criteria, and asks Codex to argue for the strongest alternative. Store its result as `evaluation.preMortem`.
-3. Act on it: surviving failure modes become risks the build plan must cover; a survivor marked `spikeCandidate` goes to SPIKE rather than to the user as a risk; if `recommendationShouldChange`, change the recommendation or lower its confidence and record the dissent. Never paper over a met kill criterion.
+1. Evaluate each approach against the actual repo: feasibility, risks, a preferred approach and why. Write `evaluation`.
+2. Dispatch one `amux:premortem` with `plan.json` and the repo root. Store its JSON as `evaluation.preMortem` exactly as returned; `build-plan` reads its fields.
+3. Surviving failure modes become risks the build plan must cover; spike every `spikeCandidate` survivor, or, when settling it needs what the build creates, record it as a pre-build check with the reason; if `recommendationShouldChange`, change the recommendation or lower its confidence and record the dissent. Never paper over a met kill criterion.
 
 ### SPIKE
-Run only when a feasibility question is still open after EVALUATE: a surviving failure mode or kill criterion whose evidence is unknown rather than unfavourable; a recommendation whose confidence is low for an empirically testable reason; or two close approaches separated by a measurable property. Not for anything a docs lookup or Grep settles, not for judgment calls, and not for an experiment that would be a meaningful fraction of the build.
+Only when a question survives EVALUATE that a small experiment would settle and docs or Grep would not: a kill criterion whose evidence is unknown, low confidence for a testable reason, or two close approaches separated by a measurable property. Not for judgment calls or anything that is a meaningful fraction of the build.
 
-Delegate to the **`spike` skill** with the question, the approach it bears on, and the plan directory. It designs the experiment with a pre-stated falsification criterion, optionally runs it on both engines, records the result under `spikes` in `plan.json`, and updates the evaluation: a confirmed spike raises feasibility and retires the failure mode; a falsified one meets the kill criterion and changes the recommendation (loop back to FORMULATE/EVALUATE if nothing else holds up); an inconclusive one stays a risk with its confound noted.
+1. **Design**, before anything runs: the question (yes/no or a number), what it bears on, **falsified if** (the result that rules the approach out), a time box (a few files, no polish — blowing it is a result), and confounds that would make a pass meaningless. Ask the user first if it needs credentials, external services, or real data.
+2. **Run** in `plans/{slug}/spikes/{name}/claude/`, capturing output verbatim. When passing for the wrong reason is likely or the answer decides the approach, also give Codex the identical brief, without Claude's code, credentials, or data the user has not approved: `mkdir -p` its directory, then through Bash with a timeout set from the time box (at most 600000 ms), `out=$(mktemp); codex exec --skip-git-repo-check -s workspace-write -C plans/{slug}/spikes/{name}/codex -o "$out" -` with the brief on stdin, asking for `{ "result": "confirmed|falsified|inconclusive", "evidence": "...", "assumptions": [] }`. A timeout is recorded as "blew the time box". Afterwards `git status` and discard anything written outside the spike directory. Codex unavailable means Claude only; say so.
+3. **Judge**: one engine — the evidence against the falsification criterion. Two engines — confirmed or falsified only when both agree; disagreement or a blown box is **inconclusive**, with both evidence blocks. Never resolve a disagreement by picking the answer you preferred.
+4. **Record** under `spikes`: name, question, bearsOn, falsifiedIf, timeBox, confounds, runs, result. Confirmed retires the failure mode; falsified meets the kill criterion and changes the recommendation (back to FORMULATE if nothing else holds); inconclusive stays a risk and a pre-build check.
 
 ### PRESENT
-Show the user: the approaches with their evidence, the evaluation and recommendation, the pre-mortem (surviving failure modes, any kill criterion met, Codex's dissent), and spike results or the one-line note that none was needed. A recommendation without its surviving failure modes is a sales pitch. Wait for the user's choice before writing any code.
+Approaches with evidence, the recommendation, the pre-mortem (survivors, met kill criteria, Codex's dissent), spike results, and Tools degraded. A recommendation without its surviving failure modes is a sales pitch. Wait for the user's choice.
 
 ### SELECTED
-Record `selectedApproach` and `phase: "SELECTED"`. One quick check: is the chosen approach obviously infeasible against the codebase (names a module or API that does not exist, contradicts a hard constraint)? If the user chose something other than the recommendation, re-read its kill criteria and the pre-mortem, and offer a spike if it carries an open feasibility question. If the check trips, loop back to FORMULATE/EVALUATE.
+Record `selectedApproach`. If the user chose against the recommendation, re-read its kill criteria and the pre-mortem and offer a spike for any open feasibility question. Obviously infeasible against the repo: back to FORMULATE.
 
 ### BUILD-PLAN
-Dispatch one `amux:build-plan` with `plan.json` and the repository root. It detects the real quality commands, slices the work into vertical TDD gates with a declared test mix and named RED tests, carries every surviving failure mode into a test or verification step, carries spike learnings into gate notes, and writes `prd.md`. If it returns `blockers`, loop back to FORMULATE/EVALUATE; do not present a plan its author says cannot be built. Check that every surviving failure mode appears in its `riskCoverage`.
+Dispatch one `amux:build-plan` with `plan.json` and the repo root; it writes `prd.md`. Returned `blockers` send you back to FORMULATE; `uncoveredCriteria` go to the user (cut the criterion or revisit UNDERSTAND). Check every surviving failure mode appears in `riskCoverage` and every acceptance criterion in `acceptanceCoverage`.
 
 ### REVIEW-PLAN
-Delegate to the **`plan-review` skill** on the plan directory. It reviews assumptions, completeness, structure, and scope; verifies the critical and high findings; applies confirmed mechanical fixes; and records the rest under `review` in `plan.json`. Resolve every `pendingConfirm` item with the user (an accepted change that invalidates the approach loops back to FORMULATE/EVALUATE), surface `guessedAssumptions` as pre-build checks, and present the final gate list once `buildReady`. Offer `/amux:build {slug}`.
+1. **Review.** Dispatch `amux:review` in mode `plan` with `prd.md`, `plan.json`, and the repo root.
+2. **Verify.** Group the critical and high findings by plan section and dispatch one `amux:verify` per group in one request, each with its findings (`kind: plan`, ids, premises), the repo root, the plan directory, and the relevant `prd.md` excerpt. Empirical findings are fact-checked; judgment findings on their premise only. Medium and low pass as PLAUSIBLE, and a PLAUSIBLE `auto` finding becomes `confirm`. REFUTED findings are dropped (kept in the report with evidence); a verifier failure leaves findings PLAUSIBLE.
+3. **Act.** Apply only findings that are `applyMode: auto` and CONFIRMED. If any critical or high finding was applied, review and verify once more. Every `confirm` finding goes to the user as a decision; one that invalidates the approach loops to FORMULATE.
+4. **Record** `review`: `round`, `buildReady` (no critical or high finding left), `applied`, `pendingConfirm`, `refuted`, `guessedAssumptions` (each with `verifyBefore` gate), `summary`. Present applied, refuted, decisions, checks to run before building, medium/low suggestions, and Tools degraded. Once build-ready, offer `/amux:build {slug}`.
 
-**Replan on failure.** When the build hits a wall the plan did not anticipate, the build skill hands back here at FORMULATE/EVALUATE with what it learned. Do not force the original plan through.
+**Replan on failure.** When the build hits a wall the plan did not anticipate, it hands back here at FORMULATE with what it learned. Do not force the original plan through.
 
 ## Never
 
-Present approaches without evidence or without kill criteria; present a recommendation without its pre-mortem; run a spike without a pre-stated falsification criterion or merge spike code; collapse the options before the user chooses; start implementation before the user selects and the plan clears REVIEW-PLAN; skip the pre-mortem or the review because Codex is unavailable (Claude-only still adds value).
+Approaches without evidence or kill criteria; a recommendation without its pre-mortem; a spike without a pre-stated falsification criterion, or merged spike code; a two-engine disagreement called confirmed; an unverified finding applied to the plan; implementation before the user selects and the plan clears review; skipping a stage because Codex is unavailable.
