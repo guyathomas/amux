@@ -50,7 +50,7 @@ Every agent carries the same Tools section, so the plugin does not depend on you
 
 ### Codex
 
-Codex argues against things; it never co-authors a finding. `verify`, `premortem`, research challengers, and planning's optional dual-engine spike run `codex exec` directly through Bash (read-only sandbox, except the spike's `workspace-write` run confined to its directory) using your Codex CLI's default model. Without Codex every path runs Claude-only and says so.
+Codex argues against things; it never co-authors a finding. `verify`, `premortem`, research challengers, and planning's optional dual-engine spike run `codex exec` directly through Bash (read-only sandbox, except the spike's `workspace-write` run confined to its directory) using your Codex CLI's default model. Without Codex every path runs Claude-only and says so. Each call is a Bash command, so unless you run in auto mode, allow `Bash(codex exec:*)` in your settings to avoid a permission prompt per call.
 
 ### Validation
 

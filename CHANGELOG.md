@@ -22,6 +22,9 @@ A simplification release with a few additions: five skills and four agents, no c
 - **Click tests and axe-core**: UI gates include a browser click test that runs an axe-core scan; serious or critical violations fail it. The plan reviewer and the code reviewer flag UI work that has neither.
 - Planning research covers library source, analogous open-source code, and comparable products' public docs.
 
+### Upgrading
+- Existing `plans/*/prd.md` files with the old Goal / Selected approach headings and no acceptance criteria still build; re-run `/amux:planning review {slug}` to have the reviewer flag missing criteria. Leftover `task-loop.json` files are ignored and can be deleted.
+
 ### Removed
 - `commands/` (all six): skills are already invocable as `/amux:<name>`.
 - Hooks: the session-start banner and the task-loop Stop hook. Long runs resume from `plan.json` or `state.json`; `task-loop.json` is no longer written.
