@@ -65,8 +65,8 @@ Codex argues against things; it never co-authors a finding. `verify`, `premortem
 ## Installation
 
 ```bash
-/plugin marketplace add guyathomas/amux-marketplace
-/plugin install amux@amux-marketplace
+/plugin marketplace add guyathomas/amux
+/plugin install amux@amux
 ```
 
 ## License
