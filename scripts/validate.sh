@@ -5,8 +5,8 @@
 # skill frontmatter names match their directories; agent frontmatter names match
 # filenames; every amux:<name> reference resolves to an agent or skill; every
 # agent's JSON "agent" identifier equals its filename and is unique; agents declare
-# no tools: list; agents use model: inherit except the judge roles allowed to pin
-# fable; every agent and researching skill carries the identical Tools section;
+# no tools: list; agents use model: inherit except the judge roles, which pin
+# claude-opus-5-5; every agent and researching skill carries the identical Tools section;
 # no stale references to removed components; README counts match disk.
 
 set -uo pipefail
@@ -69,17 +69,18 @@ done
 
 # --- Model policy ---------------------------------------------------------------
 # Agents inherit the user's default model. Only judge roles whose wrong verdict
-# would silently drop a finding or misdirect the build may pin fable.
-FABLE_ROLES="verify premortem build-plan"
+# would silently drop a finding or misdirect the build pin claude-opus-5-5.
+PINNED_MODEL="claude-opus-5-5"
+PINNED_ROLES="verify premortem build-plan"
 for a in agents/*.md; do
     base=$(basename "$a" .md)
     model=$(awk 'NR>1 && /^---/{exit} /^model:/{sub(/^model:[ ]*/,""); print; exit}' "$a")
-    if [[ " $FABLE_ROLES " == *" $base "* ]]; then
-        [[ "$model" == "fable" || "$model" == "inherit" ]] && ok "agent $base model '$model' (fable allowed)" \
-            || err "$a: model '$model' — judge roles pin fable or inherit"
+    if [[ " $PINNED_ROLES " == *" $base "* ]]; then
+        [[ "$model" == "$PINNED_MODEL" ]] && ok "agent $base model $PINNED_MODEL" \
+            || err "$a: model '$model' — judge roles pin $PINNED_MODEL"
     else
         [[ "$model" == "inherit" ]] && ok "agent $base model inherit" \
-            || err "$a: model '$model' — only judge roles ($FABLE_ROLES) may pin a model; use inherit"
+            || err "$a: model '$model' — only judge roles ($PINNED_ROLES) may pin a model; use inherit"
     fi
 done
 

@@ -2,7 +2,7 @@
 name: build-plan
 description: |
   Writes the execution plan for a selected approach: plans/{slug}/prd.md with the goal, the repo's real quality commands, and an ordered set of TDD gates, each a working vertical slice that opens with named failing tests and closes only when lint, format, test, and build pass. Carries surviving pre-mortem failure modes and spike learnings into the gates. Dispatched by the planning skill at BUILD-PLAN — do not invoke directly.
-model: fable
+model: claude-opus-5-5
 ---
 
 You write the plan an implementer, a person or the `build` skill running unattended, executes gate by gate. A vague gate costs the implementer a context window; a gate with fake tests costs a rewrite. The gates must name real files, real modules, and real commands, so read the codebase freely.

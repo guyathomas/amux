@@ -16,7 +16,7 @@ A Claude Code plugin: five skills and four agents. There is no build step; the f
 - Codex is used only where it argues against something (verify, pre-mortem, research challengers, planning's optional dual-engine spike), called as `codex exec` through Bash with the CLI's default model, and every path has a Claude-only fallback that says so.
 - The plugin must work without the user's CLAUDE.md. Tool choice lives in one `<!-- tools -->` section, copied verbatim into every agent and into the planning and research skills (`scripts/validate.sh` enforces identity; edit all copies together). It names tools by job, gives third-party names only as examples, ends every line with a built-in fallback, and requires every gap to be reported in `toolsDegraded`. The user's own instructions override its order.
 - One state file per run (`plans/{slug}/plan.json`, `research/{slug}/state.json`) with the phase and what is done, so a context reset can resume. No counters, no per-phase files.
-- Agents use `model: inherit`. Pin `fable` only where a wrong judgment silently drops a finding or misdirects the build: `verify`, `premortem`, `build-plan`. `scripts/validate.sh` enforces that list. Fable is optional: switch those files to `inherit` and everything still works.
+- Agents use `model: inherit`. Pin `claude-opus-5-5` only where a wrong judgment silently drops a finding or misdirects the build: `verify`, `premortem`, `build-plan`. `scripts/validate.sh` enforces that list.
 
 ## Before committing
 

@@ -16,12 +16,12 @@ Invoke as `/amux:<name>` or let Claude pick one when the request matches.
 
 ### Agents (4)
 
-Registered as `amux:<name>`; skills dispatch them. Agents declare no tool list, so they inherit whatever research MCPs your environment has. Three roles pin Claude Fable, where a wrong judgment silently drops a finding or misdirects the build; switching those files to `model: inherit` changes nothing else.
+Registered as `amux:<name>`; skills dispatch them. Agents declare no tool list, so they inherit whatever research MCPs your environment has. Three roles pin Claude Opus 5.5 (`claude-opus-5-5`), where a wrong judgment silently drops a finding or misdirects the build; the reviewer uses your session's model.
 
 - **review** — the single reviewer, in mode `change` (six sections over a diff) or `plan` (assumptions, completeness, gate graph, scope); every judgment carries a checkable premise
-- **verify** (Fable) — the adversary, per batch of findings sharing a file or section: refutes implementation claims against the code, defends the design, fact-checks plan claims, and asks Codex once to argue the other side
-- **premortem** (Fable) — assumes the recommended approach was built and failed, tests each post-mortem against the evidence and kill criteria, and gets Codex's dissent
-- **build-plan** (Fable) — writes `prd.md`: real quality commands, vertical TDD gates with named RED tests, every surviving risk covered
+- **verify** (Opus 5.5) — the adversary, per batch of findings sharing a file or section: refutes implementation claims against the code, defends the design, fact-checks plan claims, and asks Codex once to argue the other side
+- **premortem** (Opus 5.5) — assumes the recommended approach was built and failed, tests each post-mortem against the evidence and kill criteria, and gets Codex's dissent
+- **build-plan** (Opus 5.5) — writes `prd.md`: real quality commands, vertical TDD gates with named RED tests, every surviving risk covered
 
 ### Artifacts written to your repo
 

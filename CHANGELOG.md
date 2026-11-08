@@ -11,6 +11,7 @@ A simplification release with a few additions: five skills and four agents, no c
 - **One reviewer agent.** `review` replaces `review-change` and `review-plan`, with a `change` or `plan` mode; same sections and outputs as before, plus acceptance-criteria, click-test, and `toolsDegraded` checks.
 - **Codex is called directly.** `verify`, `premortem`, research challengers, and the planning spike run `codex exec` through Bash with the Codex CLI's default model. The model is no longer pinned in the plugin.
 - Skill prose trimmed by roughly a third; the `code-review-pipeline` skill's frontmatter name now matches its directory.
+- **Judge roles pin Claude Opus 5.5.** `verify`, `premortem`, and `build-plan` use `model: claude-opus-5-5`; `review` inherits the session model. Validation enforces the list.
 - `scripts/validate.sh` checks skill names against directories and flags stale references to removed components; the hook, shim, command, and Codex-model checks are gone.
 
 ### Added
