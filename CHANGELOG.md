@@ -2,6 +2,23 @@
 
 All notable changes to the amux plugin. Versions follow semver: breaking changes to commands, hooks, or artifact formats bump the major version.
 
+## [10.0.0] - 2026-11-08
+
+A second simplification release: four skills and four agents, no commands, hooks, or MCP server. Skills, agents, and the plugin manifest changed shape, hence the major bump.
+
+### Changed
+- **planning absorbs spike and plan-review.** Feasibility spikes (pre-stated falsifier, optional independent Codex run, disagreement is inconclusive) are its SPIKE phase; the plan review (reviewer, verifier on critical and high findings, only CONFIRMED mechanical fixes applied) is its REVIEW-PLAN phase. `/amux:planning review {slug}` re-reviews an existing plan.
+- **One reviewer agent.** `review` replaces `review-change` and `review-plan`, with a `change` or `plan` mode and the same sections and output shapes as before.
+- **Codex is called directly.** `verify`, `premortem`, research challengers, and the planning spike run `codex exec` through Bash with the Codex CLI's default model. The model is no longer pinned in the plugin.
+- Skill prose trimmed by roughly a third; the `code-review-pipeline` skill's frontmatter name now matches its directory.
+- `scripts/validate.sh` checks skill names against directories and flags stale references to removed components; the hook, shim, command, and Codex-model checks are gone.
+
+### Removed
+- `commands/` (all six): skills are already invocable as `/amux:<name>`.
+- Hooks: the session-start banner and the task-loop Stop hook. Long runs resume from `plan.json` or `state.json`; `task-loop.json` is no longer written.
+- The `codex` MCP server (`mcp/codex.py`), its smoke test, and `docs/dual-engine.md`.
+- Skills `spike` and `plan-review`; agents `review-change` and `review-plan`.
+
 ## [9.0.0] - 2026-10-09
 
 A simplification release: the same finding-versus-judging architecture with a third of the machinery. Agent and artifact formats changed, hence the major bump.
