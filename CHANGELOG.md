@@ -2,6 +2,14 @@
 
 All notable changes to the amux plugin. Versions follow semver: breaking changes to commands, hooks, or artifact formats bump the major version.
 
+## [10.0.1] - 2026-11-08
+
+### Changed
+- The marketplace is renamed from `amux-dev` to `amux`, so the plugin installs as `amux@amux`. Existing installs: `/plugin marketplace remove amux-dev`, then `/plugin marketplace add guyathomas/amux` and `/plugin install amux@amux`.
+
+### Fixed
+- README install commands pointed at `guyathomas/amux-marketplace`, which does not exist.
+
 ## [10.0.0] - 2026-11-08
 
 A simplification release with a few additions: five skills and four agents, no commands, hooks, or MCP server. Skills, agents, the plugin manifest, and the `prd.md` format changed shape, hence the major bump.
