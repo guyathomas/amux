@@ -46,7 +46,7 @@ Verdicts require cited evidence everywhere. "Seems fine" is not a refutation; "p
 
 ### Tools
 
-Every agent carries the same Tools section, so the plugin does not depend on your CLAUDE.md. It picks a tool by job (version-exact docs such as Context7, the library's own source via a shallow clone, a GitHub tool for prior art, a search tool such as Serper, a scraper such as Firecrawl) and always falls back to the built-ins. Your own instructions override its order. Each run starts with a tool check, and every gap ends up in the report under **Tools degraded**, with a status: not installed, not running, quota exhausted, error, or timeout.
+Every agent carries the same Tools section, so the plugin does not depend on your CLAUDE.md. It picks a tool by job (version-exact docs such as Context7, the library's own source via a shallow clone, a GitHub tool for prior art, a search tool such as Serper, a scraper such as Firecrawl) and always falls back to the built-ins. Your own instructions override its order. Each run starts with a tool check, and every gap ends up in the report under **Tools degraded**, with a status: not installed, not running, needs auth, denied, quota exhausted, error, or timeout.
 
 ### Codex
 

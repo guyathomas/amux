@@ -43,9 +43,11 @@ Pick by job and use the first option your tool list has. Tool preferences in the
 - **Reading a page:** a scraping tool that renders JavaScript (e.g. Firecrawl). Built-in: WebFetch.
 - **This repo:** Grep, Glob, Read; an LSP or code-intelligence tool when present.
 
-Call out every gap; never degrade silently. Record each in `toolsDegraded` in your output, `[{ "capability": "web search", "tool": "Firecrawl", "status": "not-installed|not-running|quota-exhausted|error|timeout", "detail": "...", "fellBackTo": "WebSearch" }]`:
+Call out every gap; never degrade silently. Record each in `toolsDegraded` in your output, `[{ "capability": "web search", "tool": "Firecrawl", "status": "not-installed|not-running|needs-auth|denied|quota-exhausted|error|timeout", "detail": "...", "fellBackTo": "WebSearch" }]`:
 - **not-installed:** no non-built-in option for a capability you needed is in your tool list.
 - **not-running:** your context says the server failed to connect, or every call fails to reach it.
+- **needs-auth:** the tool asks for a login or API key you cannot provide.
+- **denied:** the session's permissions blocked the call.
 - **quota-exhausted:** the tool reports exhausted credits, quota, or a rate limit. Do not retry it this run.
 - **error / timeout:** after one retry.
 Then move to the next option. Omit the field when nothing degraded.

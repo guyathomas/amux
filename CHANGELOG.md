@@ -20,6 +20,7 @@ A simplification release with a few additions: five skills and four agents, no c
 - **Tool check and `toolsDegraded`**: planning and research state up front which tool will serve each job and which are missing or not running; every skill says whether Codex is available, and build checks its test runners. Every gap (not installed, not running, quota exhausted, error, timeout) appears in the report under **Tools degraded**.
 - **Combined product and tech spec**: planning captures acceptance criteria and non-goals. `prd.md`'s Goal and Selected approach sections become Product and Design, with a Mermaid diagram when the change crosses components. Every acceptance criterion maps to a gate's test.
 - **Click tests and axe-core**: UI gates include a browser click test that runs an axe-core scan; serious or critical violations fail it. The plan reviewer and the code reviewer flag UI work that has neither.
+- Inferred non-goals and constraints are marked `inferred` and confirmed by the user; they cannot remove committed click tests or axe scans. Pre-mortem results are stored verbatim; every spike candidate is spiked or recorded as a pre-build check with a reason. Tool statuses add `needs-auth` and `denied`.
 - Planning research covers library source, analogous open-source code, and comparable products' public docs.
 
 ### Upgrading

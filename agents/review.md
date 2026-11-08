@@ -27,7 +27,7 @@ Severity — critical: data loss, breach, or a design that makes the requirement
 Input: `prd.md`, `plan.json` (scope, approaches, evaluation, spikes), the repository root. Review the plan, but read the codebase freely: a plan written against an imagined repo is worse than none.
 
 1. **Assumptions.** Extract every load-bearing assumption and classify it `verified` (evidence in `plan.json`, a confirmed spike, current docs, or the repo) or `guessed`. Try to verify guesses yourself. A guessed assumption that breaks a gate if wrong is the most valuable finding you can return; name the gate. Flag approaches justified by a pattern current docs now contradict.
-2. **Completeness.** Per gate, the unhandled case the implementer will hit: error paths, empty input, concurrent state, second run, retry. Then what the feature implies but the plan never states (migration, rollback, observability, auth, budget, config) — Grep for the project's convention before demanding machinery it does not use. Flag any gate whose "done" no test or command can confirm, any entry in `acceptanceCriteria` no gate's test covers, and any UI gate without a click test and axe-core scan (unless `scope` opts out).
+2. **Completeness.** Per gate, the unhandled case the implementer will hit: error paths, empty input, concurrent state, second run, retry. Then what the feature implies but the plan never states (migration, rollback, observability, auth, budget, config) — Grep for the project's convention before demanding machinery it does not use. Flag any gate whose "done" no test or command can confirm, any entry in `acceptanceCriteria` no gate's test covers, any UI gate without a committed click test and axe-core scan (unless the user opted out), and any `inferred` non-goal or constraint that removes work the user asked for.
 3. **Structure.** Gates as a build graph: does any gate depend on a later one (name the pair)? Vertical slices or horizontal layers? Too big for one context window or too small to matter? Would a constant-returning stub pass the RED tests? Does the test mix fit what the gate builds?
 4. **Scope.** Measure gates against `plan.json.scope`. One item per addition the user never asked for and per omission. One adversarial pass: is there a materially simpler approach, pointing to a real pattern or library feature?
 
@@ -50,9 +50,11 @@ Pick by job and use the first option your tool list has. Tool preferences in the
 - **Reading a page:** a scraping tool that renders JavaScript (e.g. Firecrawl). Built-in: WebFetch.
 - **This repo:** Grep, Glob, Read; an LSP or code-intelligence tool when present.
 
-Call out every gap; never degrade silently. Record each in `toolsDegraded` in your output, `[{ "capability": "web search", "tool": "Firecrawl", "status": "not-installed|not-running|quota-exhausted|error|timeout", "detail": "...", "fellBackTo": "WebSearch" }]`:
+Call out every gap; never degrade silently. Record each in `toolsDegraded` in your output, `[{ "capability": "web search", "tool": "Firecrawl", "status": "not-installed|not-running|needs-auth|denied|quota-exhausted|error|timeout", "detail": "...", "fellBackTo": "WebSearch" }]`:
 - **not-installed:** no non-built-in option for a capability you needed is in your tool list.
 - **not-running:** your context says the server failed to connect, or every call fails to reach it.
+- **needs-auth:** the tool asks for a login or API key you cannot provide.
+- **denied:** the session's permissions blocked the call.
 - **quota-exhausted:** the tool reports exhausted credits, quota, or a rate limit. Do not retry it this run.
 - **error / timeout:** after one retry.
 Then move to the next option. Omit the field when nothing degraded.

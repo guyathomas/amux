@@ -36,9 +36,11 @@ Pick by job and use the first option your tool list has. Tool preferences in the
 - **Reading a page:** a scraping tool that renders JavaScript (e.g. Firecrawl). Built-in: WebFetch.
 - **This repo:** Grep, Glob, Read; an LSP or code-intelligence tool when present.
 
-Call out every gap; never degrade silently. Record each in `toolsDegraded` in your output, `[{ "capability": "web search", "tool": "Firecrawl", "status": "not-installed|not-running|quota-exhausted|error|timeout", "detail": "...", "fellBackTo": "WebSearch" }]`:
+Call out every gap; never degrade silently. Record each in `toolsDegraded` in your output, `[{ "capability": "web search", "tool": "Firecrawl", "status": "not-installed|not-running|needs-auth|denied|quota-exhausted|error|timeout", "detail": "...", "fellBackTo": "WebSearch" }]`:
 - **not-installed:** no non-built-in option for a capability you needed is in your tool list.
 - **not-running:** your context says the server failed to connect, or every call fails to reach it.
+- **needs-auth:** the tool asks for a login or API key you cannot provide.
+- **denied:** the session's permissions blocked the call.
 - **quota-exhausted:** the tool reports exhausted credits, quota, or a rate limit. Do not retry it this run.
 - **error / timeout:** after one retry.
 Then move to the next option. Omit the field when nothing degraded.
@@ -48,7 +50,7 @@ Then move to the next option. Omit the field when nothing degraded.
 ## Process
 
 ### UNDERSTAND
-Clarify the problem, who it is for, numbered acceptance criteria (AC1, AC2, … — observable behaviour a test can check), non-goals, constraints, and the technologies in play. Write the ask as `scope` (not a plan; the reviewer measures drift against it), and the criteria and non-goals as `acceptanceCriteria` and `nonGoals`.
+Clarify the problem, who it is for, numbered acceptance criteria (AC1, AC2, … — observable behaviour a test can check), non-goals, constraints, and the technologies in play. Write the ask as `scope` (not a plan; the reviewer measures drift against it), and the criteria and non-goals as `acceptanceCriteria` and `nonGoals`. A non-goal or constraint you inferred (from repo conventions, not from the user) is marked `inferred: true` and shown at PRESENT for the user to confirm; never treat it as stated.
 
 ### RESEARCH
 In parallel: current docs for the libraries in play or under consideration, read in source where the docs fall short; analogous open-source implementations, read in code; how comparable products expose this feature (their public docs and changelogs); and the conventions of the code you will touch. Notes go in `notes/`.
@@ -58,8 +60,8 @@ Genuinely distinct approaches, never a false simple-versus-complex binary. Each 
 
 ### EVALUATE
 1. Evaluate each approach against the actual repo: feasibility, risks, a preferred approach and why. Write `evaluation`.
-2. Dispatch one `amux:premortem` with `plan.json` and the repo root. Store its result as `evaluation.preMortem`.
-3. Surviving failure modes become risks the build plan must cover; a `spikeCandidate` survivor goes to SPIKE; if `recommendationShouldChange`, change the recommendation or lower its confidence and record the dissent. Never paper over a met kill criterion.
+2. Dispatch one `amux:premortem` with `plan.json` and the repo root. Store its JSON as `evaluation.preMortem` exactly as returned; `build-plan` reads its fields.
+3. Surviving failure modes become risks the build plan must cover; spike every `spikeCandidate` survivor, or, when settling it needs what the build creates, record it as a pre-build check with the reason; if `recommendationShouldChange`, change the recommendation or lower its confidence and record the dissent. Never paper over a met kill criterion.
 
 ### SPIKE
 Only when a question survives EVALUATE that a small experiment would settle and docs or Grep would not: a kill criterion whose evidence is unknown, low confidence for a testable reason, or two close approaches separated by a measurable property. Not for judgment calls or anything that is a meaningful fraction of the build.
