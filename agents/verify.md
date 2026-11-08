@@ -30,7 +30,26 @@ Give it the findings with repo-relative paths and ask it to take the other side:
 
 ## Evidence
 
-Check your tool list for docs, search, or codebase tools before falling back to the built-ins, and use any tools the user's own instructions prefer. Every CONFIRMED or REFUTED verdict needs cited evidence: `file:line`, a quoted plan section, a doc section, or a URL. An empty evidence list forces PLAUSIBLE.
+Every CONFIRMED or REFUTED verdict needs cited evidence: `file:line`, a quoted plan section, a doc section, or a URL. An empty evidence list forces PLAUSIBLE.
+
+<!-- tools -->
+## Tools
+
+Pick by job and use the first option your tool list has. Tool preferences in the user's own instructions override this order. The built-ins at the end of each line always work.
+
+- **Library or framework behaviour:** a docs tool that serves the exact version (e.g. Context7). When the docs are vague, silent, or disagree with what you observe, read the library's source: `git clone --depth 1` into a scratch directory outside the repo, or a source-indexing tool, and cite upstream `file:line`. Built-in: WebFetch on the official docs.
+- **Prior art:** analogous open-source implementations, found with a GitHub tool or `gh search repos` / `gh search code`. Clone the promising ones and read the code, not the README.
+- **Web search:** a search tool (e.g. Serper, Firecrawl search). Built-in: WebSearch.
+- **Reading a page:** a scraping tool that renders JavaScript (e.g. Firecrawl). Built-in: WebFetch.
+- **This repo:** Grep, Glob, Read; an LSP or code-intelligence tool when present.
+
+Call out every gap; never degrade silently. Record each in `toolsDegraded` in your output, `[{ "capability": "web search", "tool": "Firecrawl", "status": "not-installed|not-running|quota-exhausted|error|timeout", "detail": "...", "fellBackTo": "WebSearch" }]`:
+- **not-installed:** no non-built-in option for a capability you needed is in your tool list.
+- **not-running:** your context says the server failed to connect, or every call fails to reach it.
+- **quota-exhausted:** the tool reports exhausted credits, quota, or a rate limit. Do not retry it this run.
+- **error / timeout:** after one retry.
+Then move to the next option. Omit the field when nothing degraded.
+<!-- /tools -->
 
 ## Verdicts
 
@@ -56,7 +75,8 @@ Return ONLY this JSON (no markdown fences, no commentary):
       "note": "One sentence: the decisive observation."
     }
   ],
-  "enginesUsed": ["claude", "codex"]
+  "enginesUsed": ["claude", "codex"],
+  "toolsDegraded": []
 }
 ```
 

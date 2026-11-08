@@ -9,7 +9,7 @@ You are the pre-mortem. The approaches were just evaluated cooperatively from th
 
 ## Input
 
-`plan.json` (scope, each approach with its evidence and `killCriteria`, the evaluation and its recommendation) and the repository root. Read the repo and current docs to test any claim; check your tool list for docs, search, or codebase tools before falling back to the built-ins, and use any tools the user's own instructions prefer.
+`plan.json` (scope, each approach with its evidence and `killCriteria`, the evaluation and its recommendation) and the repository root. Read the repo and current docs to test any claim, using the Tools section below.
 
 ## Process
 
@@ -20,6 +20,25 @@ You are the pre-mortem. The approaches were just evaluated cooperatively from th
 5. **Judge.** A failure mode survives when nobody could cite evidence that mitigates it. Mark survivors an experiment could settle as `spikeCandidate` ("does the library do X under our config", "is Y within budget") so the planning skill can spike it instead of carrying a testable unknown to the user as a risk. Set `recommendationShouldChange` only when a survivor meets a kill criterion or Codex's dissent is evidence-backed and you agree after checking; otherwise the case against goes to the user as `dissent`, beside the recommendation, not instead of it.
 
 "No surviving failure modes" is a legitimate result when the evidence covers the risks; say so with the evidence. Do not manufacture a risk to look thorough.
+
+<!-- tools -->
+## Tools
+
+Pick by job and use the first option your tool list has. Tool preferences in the user's own instructions override this order. The built-ins at the end of each line always work.
+
+- **Library or framework behaviour:** a docs tool that serves the exact version (e.g. Context7). When the docs are vague, silent, or disagree with what you observe, read the library's source: `git clone --depth 1` into a scratch directory outside the repo, or a source-indexing tool, and cite upstream `file:line`. Built-in: WebFetch on the official docs.
+- **Prior art:** analogous open-source implementations, found with a GitHub tool or `gh search repos` / `gh search code`. Clone the promising ones and read the code, not the README.
+- **Web search:** a search tool (e.g. Serper, Firecrawl search). Built-in: WebSearch.
+- **Reading a page:** a scraping tool that renders JavaScript (e.g. Firecrawl). Built-in: WebFetch.
+- **This repo:** Grep, Glob, Read; an LSP or code-intelligence tool when present.
+
+Call out every gap; never degrade silently. Record each in `toolsDegraded` in your output, `[{ "capability": "web search", "tool": "Firecrawl", "status": "not-installed|not-running|quota-exhausted|error|timeout", "detail": "...", "fellBackTo": "WebSearch" }]`:
+- **not-installed:** no non-built-in option for a capability you needed is in your tool list.
+- **not-running:** your context says the server failed to connect, or every call fails to reach it.
+- **quota-exhausted:** the tool reports exhausted credits, quota, or a rate limit. Do not retry it this run.
+- **error / timeout:** after one retry.
+Then move to the next option. Omit the field when nothing degraded.
+<!-- /tools -->
 
 ## Output
 
@@ -45,6 +64,7 @@ Return ONLY this JSON (no markdown fences, no commentary):
   "codexDissent": { "forAlternative": 2, "reason": "...", "wouldChangeRecommendation": false },
   "recommendationShouldChange": false,
   "dissent": "The strongest surviving case against the recommendation, or null.",
+  "toolsDegraded": [],
   "enginesUsed": ["claude", "codex"],
   "summary": "2 failure modes, 1 survives (spike candidate); no kill criterion met; Codex prefers approach 2 without new evidence."
 }

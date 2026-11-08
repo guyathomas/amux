@@ -16,20 +16,42 @@ No implementation without an evidence-backed approach the user chose with the ca
 
 ```json
 { "feature": "...", "phase": "UNDERSTAND|RESEARCH|FORMULATE|EVALUATE|SPIKE|PRESENT|SELECTED|BUILD-PLAN|REVIEW-PLAN",
-  "scope": "...", "approaches": [], "evaluation": null, "spikes": [], "selectedApproach": null, "review": null, "build": null, "updatedAt": "ISO-8601" }
+  "scope": "...", "acceptanceCriteria": [{ "id": "AC1", "text": "..." }], "nonGoals": [], "approaches": [], "evaluation": null, "spikes": [], "selectedApproach": null, "review": null, "build": null, "toolsDegraded": [], "updatedAt": "ISO-8601" }
 ```
 
 Write `phase` after every phase. If `plan.json` exists, offer to resume from its phase. `review {slug}` jumps straight to REVIEW-PLAN.
 
-Evidence standards: current docs beat training data for version-specific claims, primary sources beat articles, cite a URL for library claims and `file:line` for repo claims. Use the tools you have and any the user's instructions prefer.
+Evidence standards: current docs beat training data for version-specific claims, primary sources beat articles, cite a URL for library claims and `file:line` for repo claims.
+
+**Tool check.** Before starting, tell the user in one short block which tool will serve each capability in the Tools section, which are not installed or not running, and whether Codex is available (`command -v codex`). Pass the Tools section into every subagent prompt you write yourself. The final output lists every `toolsDegraded` entry from you and your agents under **Tools degraded**, or says none were; append them to `toolsDegraded` in the state file as they arrive.
+
+<!-- tools -->
+## Tools
+
+Pick by job and use the first option your tool list has. Tool preferences in the user's own instructions override this order. The built-ins at the end of each line always work.
+
+- **Library or framework behaviour:** a docs tool that serves the exact version (e.g. Context7). When the docs are vague, silent, or disagree with what you observe, read the library's source: `git clone --depth 1` into a scratch directory outside the repo, or a source-indexing tool, and cite upstream `file:line`. Built-in: WebFetch on the official docs.
+- **Prior art:** analogous open-source implementations, found with a GitHub tool or `gh search repos` / `gh search code`. Clone the promising ones and read the code, not the README.
+- **Web search:** a search tool (e.g. Serper, Firecrawl search). Built-in: WebSearch.
+- **Reading a page:** a scraping tool that renders JavaScript (e.g. Firecrawl). Built-in: WebFetch.
+- **This repo:** Grep, Glob, Read; an LSP or code-intelligence tool when present.
+
+Call out every gap; never degrade silently. Record each in `toolsDegraded` in your output, `[{ "capability": "web search", "tool": "Firecrawl", "status": "not-installed|not-running|quota-exhausted|error|timeout", "detail": "...", "fellBackTo": "WebSearch" }]`:
+- **not-installed:** no non-built-in option for a capability you needed is in your tool list.
+- **not-running:** your context says the server failed to connect, or every call fails to reach it.
+- **quota-exhausted:** the tool reports exhausted credits, quota, or a rate limit. Do not retry it this run.
+- **error / timeout:** after one retry.
+Then move to the next option. Omit the field when nothing degraded.
+<!-- /tools -->
+
 
 ## Process
 
 ### UNDERSTAND
-Clarify what the feature must do, its constraints, and the technologies in play. Write it as `scope` — the ask, not a plan; the reviewer later measures drift against it.
+Clarify the problem, who it is for, numbered acceptance criteria (AC1, AC2, … — observable behaviour a test can check), non-goals, constraints, and the technologies in play. Write the ask as `scope` (not a plan; the reviewer measures drift against it), and the criteria and non-goals as `acceptanceCriteria` and `nonGoals`.
 
 ### RESEARCH
-In parallel: current docs for the pieces involved, real-world implementations, how production codebases structure this and what bit them, and the conventions of the code you will touch. Notes go in `notes/`.
+In parallel: current docs for the libraries in play or under consideration, read in source where the docs fall short; analogous open-source implementations, read in code; how comparable products expose this feature (their public docs and changelogs); and the conventions of the code you will touch. Notes go in `notes/`.
 
 ### FORMULATE
 Genuinely distinct approaches, never a false simple-versus-complex binary. Each in `approaches`: `index`, `name`, `howItWorks`, `evidence`, `tradeoffs` (pros and cons with sources), `fitReason`, and **`killCriteria`**: the evidence that would rule it out, stated now while you have no favorite.
@@ -48,19 +70,19 @@ Only when a question survives EVALUATE that a small experiment would settle and 
 4. **Record** under `spikes`: name, question, bearsOn, falsifiedIf, timeBox, confounds, runs, result. Confirmed retires the failure mode; falsified meets the kill criterion and changes the recommendation (back to FORMULATE if nothing else holds); inconclusive stays a risk and a pre-build check.
 
 ### PRESENT
-Approaches with evidence, the recommendation, the pre-mortem (survivors, met kill criteria, Codex's dissent), and spike results. A recommendation without its surviving failure modes is a sales pitch. Wait for the user's choice.
+Approaches with evidence, the recommendation, the pre-mortem (survivors, met kill criteria, Codex's dissent), spike results, and Tools degraded. A recommendation without its surviving failure modes is a sales pitch. Wait for the user's choice.
 
 ### SELECTED
 Record `selectedApproach`. If the user chose against the recommendation, re-read its kill criteria and the pre-mortem and offer a spike for any open feasibility question. Obviously infeasible against the repo: back to FORMULATE.
 
 ### BUILD-PLAN
-Dispatch one `amux:build-plan` with `plan.json` and the repo root; it writes `prd.md`. Returned `blockers` send you back to FORMULATE. Check every surviving failure mode appears in its `riskCoverage`.
+Dispatch one `amux:build-plan` with `plan.json` and the repo root; it writes `prd.md`. Returned `blockers` send you back to FORMULATE; `uncoveredCriteria` go to the user (cut the criterion or revisit UNDERSTAND). Check every surviving failure mode appears in `riskCoverage` and every acceptance criterion in `acceptanceCoverage`.
 
 ### REVIEW-PLAN
 1. **Review.** Dispatch `amux:review` in mode `plan` with `prd.md`, `plan.json`, and the repo root.
 2. **Verify.** Group the critical and high findings by plan section and dispatch one `amux:verify` per group in one request, each with its findings (`kind: plan`, ids, premises), the repo root, the plan directory, and the relevant `prd.md` excerpt. Empirical findings are fact-checked; judgment findings on their premise only. Medium and low pass as PLAUSIBLE, and a PLAUSIBLE `auto` finding becomes `confirm`. REFUTED findings are dropped (kept in the report with evidence); a verifier failure leaves findings PLAUSIBLE.
 3. **Act.** Apply only findings that are `applyMode: auto` and CONFIRMED. If any critical or high finding was applied, review and verify once more. Every `confirm` finding goes to the user as a decision; one that invalidates the approach loops to FORMULATE.
-4. **Record** `review`: `round`, `buildReady` (no critical or high finding left), `applied`, `pendingConfirm`, `refuted`, `guessedAssumptions` (each with `verifyBefore` gate), `summary`. Present applied, refuted, decisions, checks to run before building, and medium/low suggestions. Once build-ready, offer `/amux:build {slug}`.
+4. **Record** `review`: `round`, `buildReady` (no critical or high finding left), `applied`, `pendingConfirm`, `refuted`, `guessedAssumptions` (each with `verifyBefore` gate), `summary`. Present applied, refuted, decisions, checks to run before building, medium/low suggestions, and Tools degraded. Once build-ready, offer `/amux:build {slug}`.
 
 **Replan on failure.** When the build hits a wall the plan did not anticipate, it hands back here at FORMULATE with what it learned. Do not force the original plan through.
 

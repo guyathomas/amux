@@ -10,6 +10,8 @@ One reviewer finds; an independent verifier with fresh context judges; only cite
 
 **Not for** config-only or docs-only diffs, one-line fixes, or `plans/*` (use `planning review {slug}`).
 
+**Tool check.** Before starting, say whether Codex is available (`command -v codex`). The report lists every `toolsDegraded` entry from the reviewer and verifiers under **Tools degraded**, or says none were.
+
 ## Process
 
 ### TARGET
@@ -27,6 +29,6 @@ Select critical and high findings (plus medium with `thorough`); the rest pass a
 - **Everything else:** report, most severe first.
 
 ### REPORT
-Write the summary to `reviews/{branch}.md` (overwrite on re-review) and present: target and counts; Fixed; Needs attention (PLAUSIBLE critical/high); Design (your decision), led by `designSummary` and plan alignment; Refuted, with the refuting evidence; Suggestions (about 20 rows, rest in the file); Missing tests and stale docs. Nothing survived: "Review complete, no verified issues", still showing the design summary and refuted list.
+Write the summary to `reviews/{branch}.md` (overwrite on re-review) and present: target and counts; Fixed; Needs attention (PLAUSIBLE critical/high); Design (your decision), led by `designSummary` and plan alignment; Refuted, with the refuting evidence; Suggestions (about 20 rows, rest in the file); Missing tests and stale docs; Tools degraded. Nothing survived: "Review complete, no verified issues", still showing the design summary and refuted list.
 
 Malformed reviewer JSON: retry once, then report what parsed.

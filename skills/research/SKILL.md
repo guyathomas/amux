@@ -8,14 +8,35 @@ argument-hint: "[topic]"
 
 Decompose, research in parallel, challenge what the report will rest on, judge sufficiency, synthesize. Done when every question is answered at medium or better by findings that survived CHALLENGE (or the gaps are documented) and `report.md` is written. A finding nobody tried to break is never high confidence.
 
-Use whatever search and fetch tools you have, preferring any the user's instructions name. Tier 1: .gov, .edu, journals, official docs. Tier 2: Reuters, AP, BBC, industry publications. Tier 3: company blogs, Wikipedia. Skip forums, social media, SEO spam. Primary sources beat articles about them.
+Tier 1: .gov, .edu, journals, official docs. Tier 2: Reuters, AP, BBC, industry publications. Tier 3: company blogs, Wikipedia. Skip forums, social media, SEO spam. Primary sources beat articles about them.
+
+**Tool check.** Before starting, tell the user in one short block which tool will serve each capability in the Tools section, which are not installed or not running, and whether Codex is available (`command -v codex`). Paste the Tools section into every researcher and challenger prompt. The final output lists every `toolsDegraded` entry from you and your agents under **Tools degraded**, or says none were; append them to `toolsDegraded` in the state file as they arrive.
+<!-- tools -->
+## Tools
+
+Pick by job and use the first option your tool list has. Tool preferences in the user's own instructions override this order. The built-ins at the end of each line always work.
+
+- **Library or framework behaviour:** a docs tool that serves the exact version (e.g. Context7). When the docs are vague, silent, or disagree with what you observe, read the library's source: `git clone --depth 1` into a scratch directory outside the repo, or a source-indexing tool, and cite upstream `file:line`. Built-in: WebFetch on the official docs.
+- **Prior art:** analogous open-source implementations, found with a GitHub tool or `gh search repos` / `gh search code`. Clone the promising ones and read the code, not the README.
+- **Web search:** a search tool (e.g. Serper, Firecrawl search). Built-in: WebSearch.
+- **Reading a page:** a scraping tool that renders JavaScript (e.g. Firecrawl). Built-in: WebFetch.
+- **This repo:** Grep, Glob, Read; an LSP or code-intelligence tool when present.
+
+Call out every gap; never degrade silently. Record each in `toolsDegraded` in your output, `[{ "capability": "web search", "tool": "Firecrawl", "status": "not-installed|not-running|quota-exhausted|error|timeout", "detail": "...", "fellBackTo": "WebSearch" }]`:
+- **not-installed:** no non-built-in option for a capability you needed is in your tool list.
+- **not-running:** your context says the server failed to connect, or every call fails to reach it.
+- **quota-exhausted:** the tool reports exhausted credits, quota, or a rate limit. Do not retry it this run.
+- **error / timeout:** after one retry.
+Then move to the next option. Omit the field when nothing degraded.
+<!-- /tools -->
+
 
 ## State
 
 `research/{slug}/state.json` (slug `a-z0-9-`, at most 50 characters):
 
 ```json
-{ "topic": "...", "phase": "DECOMPOSE|RESEARCH|CHALLENGE|EVALUATE|SYNTHESIZE|DONE", "iteration": 1, "maxIterations": 3,
+{ "topic": "...", "phase": "DECOMPOSE|RESEARCH|CHALLENGE|EVALUATE|SYNTHESIZE|DONE", "iteration": 1, "maxIterations": 3, "toolsDegraded": [],
   "questions": [{ "id": 1, "text": "...", "status": "pending|done", "confidence": null }] }
 ```
 
@@ -48,6 +69,6 @@ Apply: CONFIRMED may be high confidence; DISPUTED keeps counter-evidence, capped
 Synthesize when every question is answered at medium or better by unrefuted findings and gaps and disputes are resolved or documented. Otherwise add sharper follow-up questions from the gaps, refutations, and disputes, increment `iteration`, and return to RESEARCH — unless `maxIterations` is reached, then synthesize with the gaps documented.
 
 ### SYNTHESIZE
-`research/{slug}/report.md`: executive summary (most important finding first, with confidence); background; key findings by theme with inline citations; conflicting information (every DISPUTED finding with its counter-evidence); gaps and limitations (including what was REFUTED and why); source assessment; sources by tier. Footer: iterations, questions, findings challenged and refuted, date. Set `phase: "DONE"`.
+`research/{slug}/report.md`: executive summary (most important finding first, with confidence); background; key findings by theme with inline citations; conflicting information (every DISPUTED finding with its counter-evidence); gaps and limitations (including what was REFUTED and why); source assessment; sources by tier. Footer: iterations, questions, findings challenged and refuted, tools degraded, date. Set `phase: "DONE"`.
 
 Malformed JSON from a researcher or challenger: retry once, then mark low confidence or UNSETTLED.

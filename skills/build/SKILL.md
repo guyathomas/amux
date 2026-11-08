@@ -19,10 +19,12 @@ Under `build` in `plans/{slug}/plan.json`:
   "qualityCommands": { "lint": "...", "format": "...", "test": "...", "build": "..." },
   "preBuildChecks": [{ "claim": "...", "result": "verified|false|unverifiable", "evidence": "file:line" }],
   "gates": [{ "index": 1, "name": "...", "status": "pending|red|green|closed|blocked", "redEvidence": "...", "exitEvidence": "...", "deviations": [], "attempts": 1 }],
-  "learned": [] }
+  "learned": [], "toolsDegraded": [] }
 ```
 
 Write it after every gate transition. On resume, trust the working tree over the record: a gate is closed only if its tests exist and pass. Keep going gate after gate until DONE or REPLAN; do not stop to ask between gates.
+
+**Tool check.** Before starting, say whether every quality command and test runner the gates need (including the browser E2E runner for UI gates) is installed, and whether Codex is available. A missing one goes in `build.toolsDegraded` and is reported; never skip a level of the test mix because its runner is missing — install it as the gate's first step or REPLAN.
 
 ## Process
 
@@ -37,14 +39,14 @@ Per gate, in order; never open one before the previous is closed.
 
 - **RED.** Write the failing tests the gate declares, nothing for later gates. Confirm each fails for the right reason (an assertion, not an import error). If a constant-returning stub would pass them, sharpen them. Record `redEvidence`.
 - **GREEN.** Implement only what turns them green. When the code forces a different route, take it and record a deviation; one that changes scope or approach is REPLAN.
-- **EXIT.** Run lint, format, the full test suite, and build. Fix this gate's failures inside the gate; a failure needing another gate's scope, or a third attempt, is `blocked`: REPLAN. Record `exitEvidence`.
+- **EXIT.** Run lint, format, the full test suite (including click tests and axe-core scans for UI gates), and build. Fix this gate's failures inside the gate; a failure needing another gate's scope, or a third attempt, is `blocked`: REPLAN. Record `exitEvidence`, with the click-test trace or screenshot path for UI gates.
 - **Record.** Write `plan.json`, append to `learned`, say "Gate {N} closed: {name}." Commit per gate only if the user asked.
 
 ### REPLAN
 Triggers: a false pre-build check, a blocked gate, a RED that makes no sense against the code, a scope-changing deviation, a materialized pre-mortem failure mode. Stop, record why, and hand off to the planning skill at FORMULATE with `learned`. Closed gates stay closed.
 
 ### REVIEW
-Run the quality commands on the whole tree, then invoke the **code-review-pipeline** skill on the branch diff with the plan directory. Tell it to skip design when the plan passed review and no gate recorded a deviation. Re-run the commands if the review changed code. Present gates closed, deviations, pre-build checks, and the review summary. Set `phase: "DONE"`.
+Run the quality commands on the whole tree, then invoke the **code-review-pipeline** skill on the branch diff with the plan directory. Tell it to skip design when the plan passed review and no gate recorded a deviation. Re-run the commands if the review changed code. Present gates closed, deviations, pre-build checks, Tools degraded, and the review summary. Set `phase: "DONE"`.
 
 ## Never
 
