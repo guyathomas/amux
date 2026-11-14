@@ -8,8 +8,8 @@
   "plugins": [
     {
       "name": "amux",
-      "description": "Research, planning, and code review skills for Claude Code",
-      "version": "10.0.1",
+      "description": "Plan, ship, and challenge skills for Claude Code",
+      "version": "11.0.0",
       "source": "./",
       "author": {
         "name": "Guy Thomas",
