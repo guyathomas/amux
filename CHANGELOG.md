@@ -2,6 +2,19 @@
 
 All notable changes to the amux plugin. Versions follow semver: breaking changes to commands, hooks, or artifact formats bump the major version.
 
+## [11.1.1] - 2026-11-14
+
+Fixes from the first end-to-end trial of `plan`, `challenge`, and `ship` on a real change.
+
+### Fixed
+- **Plan path was relative.** `git rev-parse --git-path amux` prints `.git/amux`; the skills now use `--path-format=absolute` and say to create the directory.
+- **The Codex call could not carry a filled-in brief.** The quoted heredoc blocked substitution; the brief is now written to a scratch file and passed on stdin.
+- **`ship` had no path when a PR cannot be filed** (no remote, `gh` not authenticated): it stops after the challenge and reports the title and description.
+- The pre-mortem runs before the checklist exists, so the judge is told missing proofs are out of scope there.
+- A two-engine spike is inconclusive only when the runs disagree on the falsifier.
+- `challenge` spells out the brief for later rounds, has the author settle the implementation-or-design label as well as the severity, and leaves build output and caches out of the diff.
+- A test that passes before the change counts as proof only after a mutation check.
+
 ## [11.1.0] - 2026-11-14
 
 ### Changed
