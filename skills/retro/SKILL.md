@@ -10,7 +10,7 @@ Turn friction from this session into one-line changes that stop it recurring. A 
 
 ## Sources
 
-This conversation, or the transcript path given (`~/.claude/projects/{project}/{session}.jsonl`). Also what the session left behind: `plans/*/prd.md` files it created or changed (deviations, spikes, returns to planning), challenge findings that were declined or disputed, and PR review threads. Read the current `~/.claude/CLAUDE.md`, the project `CLAUDE.md`, and any project skills first, so you never propose what is already there.
+This conversation, or the transcript path given (`~/.claude/projects/{project}/{session}.jsonl`). Also what the session left behind: plans it created or changed, under `$(git rev-parse --git-path amux)/` while they exist and in the PR description once shipped (deviations, spikes, returns to planning), challenge findings that were declined or disputed, and PR review threads. Read the current `~/.claude/CLAUDE.md`, the project `CLAUDE.md`, and any project skills first, so you never propose what is already there.
 
 ## What to look for
 
@@ -33,4 +33,4 @@ Do not propose rules for one-off events, restate what the model already does unp
 
 Present them most valuable first; the user accepts, edits, or rejects each. Apply only the accepted ones. Never edit amux's installed files, which are overwritten on update: record an accepted amux change as an upstream suggestion.
 
-Write `retros/{YYYY-MM-DD}-{slug}.md` with the proposals, their evidence, the decisions, and what was applied where. End with: "{N} applied, {M} rejected, {K} suggested upstream."
+Write no report file: the applied edits are the record. Your final message lists the proposals, their evidence, the decisions, what was applied where, and any upstream suggestion in full so the user can file it. End with: "{N} applied, {M} rejected, {K} suggested upstream."

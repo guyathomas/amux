@@ -2,6 +2,19 @@
 
 All notable changes to the amux plugin. Versions follow semver: breaking changes to commands, hooks, or artifact formats bump the major version.
 
+## [11.1.0] - 2026-11-14
+
+### Changed
+- **Plans no longer live in the working tree.** `plan` keeps `prd.md` under `git rev-parse --git-path amux`, so it is never tracked and leaves no dead files. `ship` writes the decision record (the ask, the approach, rejected alternatives and what ruled them out, surviving risks) into the PR description and deletes the plan after merge.
+- Spikes run in a scratch directory outside the repo; their question, falsifier, and result are recorded in the plan.
+- `retro` reads plans from the git directory while they exist and from the PR description once shipped, and no longer writes `retros/{date}-{slug}.md`: its report is the final message and the approved edits are the record.
+
+### Removed
+- Validation rules that guarded against the repo's history instead of a real failure: the 900-word limit per skill, the ban on an `agents/` directory, the blacklist of removed component names, and the README skill count. Contributor conventions are merged down to six.
+
+### Upgrading
+- A plan already in `plans/{slug}/` still works: pass the path to its `prd.md` to `/amux:plan`, `/amux:ship`, or `/amux:challenge`. Delete it yourself once shipped.
+
 ## [11.0.0] - 2026-11-14
 
 A rebuild around contracts instead of procedures: four skills, no agents. Each skill states what is permitted, what done means, when to stop, and what must go to the user, and leaves the method to the model. Skills, agents, and the plan format changed, hence the major bump.

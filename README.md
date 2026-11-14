@@ -4,7 +4,7 @@ Plan, ship, and challenge skills for Claude Code. Each skill states a contract (
 
 ## What's Included
 
-### Skills (4)
+### Skills
 
 Invoke as `/amux:<name>` or let Claude pick one when the request matches.
 
@@ -13,13 +13,9 @@ Invoke as `/amux:<name>` or let Claude pick one when the request matches.
 - **challenge** — An independent judge argues against a diff or a plan. You get a budgeted loop of three rounds in which every finding is checked, then fixed, disputed with evidence, or declined. Design findings always come to you.
 - **retro** — End-of-session retrospective: finds where the session lost time or quality and proposes exact changes to your CLAUDE.md files, project skills, or amux, each backed by a quoted moment. Nothing is applied without your approval.
 
-### Artifacts written to your repo
+### What it writes
 
-| Path | Written by | Suggested handling |
-|---|---|---|
-| `plans/{slug}/prd.md` | plan, ship | Commit: the record of why the code looks the way it does |
-| `plans/{slug}/spikes/` | plan | Throwaway; delete once recorded |
-| `retros/{date}-{slug}.md` | retro | Commit or ignore |
+Nothing that goes stale lands in your tree. `plan` keeps each plan inside the git directory (`git rev-parse --git-path amux`), where it is never tracked and survives a context reset. When `ship` files the PR it writes the decision record (the ask, the approach, what was rejected and why, surviving risks) into the description, and deletes the plan after merge. Spikes run in a scratch directory outside the repo. `retro` writes no report; the edits you approve are the record.
 
 ## How it stays honest
 
@@ -51,7 +47,7 @@ Codex argues against things; it never co-authors. `challenge` runs `codex exec` 
 
 ## Validation
 
-`bash scripts/validate.sh` checks the manifests, skill names, the per-skill word limit, references, stale references to removed components, and the count in this README. CI runs it on every push and pull request.
+`bash scripts/validate.sh` checks that the manifests parse and agree on a version the CHANGELOG has, that each skill's name matches its directory, and that every `amux:<name>` reference resolves. CI runs it on every push and pull request.
 
 ## License
 
