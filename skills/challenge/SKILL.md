@@ -1,7 +1,7 @@
 ---
 name: challenge
 description: Has an independent judge with fresh context argue against a diff or a plan, then answers each finding with evidence in a budgeted loop. Codex is the judge when installed; otherwise a fresh subagent. Use when the user asks for a review, a second opinion, or a pre-mortem, and before shipping.
-argument-hint: "[PR# | branch | path | plans/{slug} | focus notes]"
+argument-hint: "[PR# | branch | path | plan slug | focus notes]"
 ---
 
 # Challenge
@@ -11,7 +11,7 @@ Whoever wrote the work does not judge it. A judge that has seen none of your rea
 ## Scope
 
 - **Diff:** no argument means base to working tree, untracked files included. A PR number, branch, or path narrows it. Use the same diff command every round.
-- **Plan:** `plans/{slug}/prd.md`.
+- **Plan:** a slug, which resolves to `$(git rev-parse --git-path amux)/{slug}/prd.md`, or a path to a `prd.md`. Give the judge the absolute path.
 
 Do not stash, discard, or include unrelated changes. State the intent and what is out of scope in one or two sentences. For a diff, run the repo's checks first and do not send code they fail on.
 
