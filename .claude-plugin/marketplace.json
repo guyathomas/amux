@@ -9,7 +9,7 @@
     {
       "name": "amux",
       "description": "Plan, ship, and challenge skills for Claude Code",
-      "version": "11.1.0",
+      "version": "11.1.1",
       "source": "./",
       "author": {
         "name": "Guy Thomas",

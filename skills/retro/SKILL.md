@@ -10,7 +10,7 @@ Turn friction from this session into one-line changes that stop it recurring. A 
 
 ## Sources
 
-This conversation, or the transcript path given (`~/.claude/projects/{project}/{session}.jsonl`). Also what the session left behind: plans it created or changed, under `$(git rev-parse --git-path amux)/` while they exist and in the PR description once shipped (deviations, spikes, returns to planning), challenge findings that were declined or disputed, and PR review threads. Read the current `~/.claude/CLAUDE.md`, the project `CLAUDE.md`, and any project skills first, so you never propose what is already there.
+This conversation, or the transcript path given (`~/.claude/projects/{project}/{session}.jsonl`). Also what the session left behind: plans it created or changed, under `$(git rev-parse --path-format=absolute --git-path amux)/` while they exist and in the PR description once shipped (deviations, spikes, returns to planning), challenge findings that were declined or disputed, and PR review threads. Read the current `~/.claude/CLAUDE.md`, the project `CLAUDE.md`, and any project skills first, so you never propose what is already there.
 
 ## What to look for
 
