@@ -2,6 +2,30 @@
 
 All notable changes to the amux plugin. Versions follow semver: breaking changes to commands, hooks, or artifact formats bump the major version.
 
+## [11.0.0] - 2026-11-14
+
+A rebuild around contracts instead of procedures: four skills, no agents. Each skill states what is permitted, what done means, when to stop, and what must go to the user, and leaves the method to the model. Skills, agents, and the plan format changed, hence the major bump.
+
+### Added
+- **`ship` skill**: takes a change to a merged PR. It finishes the change (one checklist item at a time when there is a plan), proves it, runs `challenge`, files the PR, watches CI and review, and merges once the merge gate passes. `no-merge` stops when the PR is ready. It never bypasses branch protection, and the user's and project's instructions override its permissions.
+- **`challenge` skill**: an independent judge with fresh context argues against a diff or a plan in a loop of at most three rounds. Codex is the judge when installed; otherwise a fresh subagent that receives only the written brief. Findings are leads until checked; a timeout or an exhausted budget is not approval.
+
+### Changed
+- **`planning` is now `plan`**, and `plans/{slug}/prd.md` is its only state, written from the first step. The pre-mortem and the plan review both run through `challenge`. The plan ends in a checklist that maps every acceptance criterion and surviving risk to its proof.
+- **`retro`** reads `prd.md` deviations, challenge outcomes, and PR threads in place of the removed state files.
+- **No pinned models.** Judges run on the session's model, so they are never weaker than the author.
+- `scripts/validate.sh` checks manifests, skill names, a 900-word limit per skill, references, and stale references; the agent, model-pin, and shared-Tools checks are gone.
+
+### Removed
+- **`build`**: its gate discipline (failing test first, replan when the code refutes the plan) lives in `ship`.
+- **`code-review-pipeline`** and the `review` and `verify` agents: replaced by `challenge`. The CONFIRMED / PLAUSIBLE / REFUTED verdicts are gone and the four severity levels become blocker / should / nit; `reviews/{branch}.md` is no longer written.
+- **`research`**: out of scope for a coding-flow plugin.
+- The `premortem` and `build-plan` agents, `plan.json`, the shared Tools section, and `toolsDegraded`. Skills say which tools they wanted and could not use.
+
+### Upgrading
+- `/amux:planning` → `/amux:plan`; `/amux:build {slug}` → `/amux:ship {slug}`; `/amux:code-review-pipeline` → `/amux:challenge`.
+- Existing `plans/*/plan.json` files are ignored. A plan in progress resumes from its `prd.md`; add a checklist to it, or re-run `/amux:plan {slug}`.
+
 ## [10.0.1] - 2026-11-08
 
 ### Changed
